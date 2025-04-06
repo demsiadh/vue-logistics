@@ -1,5 +1,4 @@
 import axiosUtil from "@/util/request";
-import { AxiosRequestConfig } from "axios";
 import { convertToFormData } from "@/util/params";
 
 interface UserListPostBody {
@@ -27,5 +26,13 @@ export const loginUser = (params: LoginUserQueryParams) => {
     headers: {
       "Content-Type": "multipart/form-data",
     },
+  });
+};
+
+export const getLoginUserStatus = () => {
+  return axiosUtil.request({
+    url: "/user/loginStatus",
+    method: "get",
+    params: {},
   });
 };

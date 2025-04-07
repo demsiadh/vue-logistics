@@ -34,5 +34,8 @@ export const getLoginUserStatus = () => {
     url: "/user/loginStatus",
     method: "get",
     params: {},
+    headers: {
+      logistics_token: localStorage.getItem("logistics_token") || "",
+    },
   });
 };

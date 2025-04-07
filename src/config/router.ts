@@ -5,8 +5,13 @@ interface RouterConfig {
 }
 
 export const ROUTER_CONFIG: Record<string, RouterConfig> = {
-  HOME: {
+  PARENT: {
     PATH: "/",
+    NAME: "parent",
+    NAME_CN: "父路由",
+  },
+  HOME: {
+    PATH: "/home",
     NAME: "home",
     NAME_CN: "首页",
   },
@@ -14,5 +19,10 @@ export const ROUTER_CONFIG: Record<string, RouterConfig> = {
     PATH: "/user",
     NAME: "user",
     NAME_CN: "用户管理",
+  },
+  LOGIN: {
+    PATH: "/login",
+    NAME: "login",
+    NAME_CN: "登录",
   },
 };

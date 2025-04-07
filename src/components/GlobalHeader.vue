@@ -4,7 +4,7 @@
       <a-col flex="150px">
         <div class="titleBar">
           <img class="logo" src="../assets/logo.png" alt="logo" />
-          <div class="title">金运物流</div>
+          <div class="title">领运物流</div>
         </div>
       </a-col>
       <a-col flex="auto">
@@ -24,7 +24,7 @@
   </div>
 </template>
 <script lang="ts" setup>
-import { h, ref } from "vue";
+import { h, onMounted, ref } from "vue";
 import { HomeFilled, UserOutlined } from "@ant-design/icons-vue";
 import { MenuProps } from "ant-design-vue";
 import { useRouter } from "vue-router";
@@ -60,8 +60,13 @@ const doMenuClick = ({ key }: { key: string }) => {
     path: key,
   });
 };
+const current = ref<string[]>([]);
 
-const current = ref<string[]>(["mail"]);
+// 在组件挂载时，根据当前路由路径设置 current 的值
+onMounted(() => {
+  current.value = [router.currentRoute.value.path];
+});
+
 router.afterEach((to) => {
   current.value = [to.path];
 });

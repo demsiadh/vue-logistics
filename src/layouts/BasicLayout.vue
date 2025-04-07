@@ -9,7 +9,7 @@
       </a-layout-content>
       <a-layout-footer class="footer">
         <a href="https://github.com/demsiadh" target="_blank">
-          用户中心 by demsiadh
+          领运物流 by demsiadh
         </a>
       </a-layout-footer>
     </a-layout>

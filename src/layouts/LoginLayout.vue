@@ -38,6 +38,7 @@ import { loginUser } from "@/api/user";
 import { loginUserStore } from "@/store/loginUserStore";
 import router from "@/router";
 import { ROUTER_CONFIG } from "@/config/router";
+import { message } from "ant-design-vue";
 
 const loginForm = reactive({
   name: "",
@@ -49,7 +50,10 @@ const onFinish = () => {
   loginUser(loginForm).then((res) => {
     if (res.data.code === 0 && res.data.data) {
       userStore.setLoginUser(res);
-      router.push(ROUTER_CONFIG.HOME.PATH);
+      message.success("登录成功");
+      router.push({
+        path: ROUTER_CONFIG.HOME.PATH,
+      });
     }
   });
 };

@@ -16,8 +16,8 @@
         />
       </a-col>
       <a-col flex="80px">
-        <div class="userLoginStatus">
-          <a-button>登录</a-button>
+        <div>
+          {{ loginUser.loginUser.username ?? "无名" }}
         </div>
       </a-col>
     </a-row>
@@ -29,7 +29,8 @@ import { HomeFilled, UserOutlined } from "@ant-design/icons-vue";
 import { MenuProps } from "ant-design-vue";
 import { useRouter } from "vue-router";
 import { ROUTER_CONFIG } from "@/config/router";
-
+import { loginUserStore } from "@/store/loginUserStore";
+const loginUser = loginUserStore();
 const items = ref<MenuProps["items"]>([
   {
     key: ROUTER_CONFIG.HOME.PATH,
@@ -83,6 +84,7 @@ router.afterEach((to) => {
   font-size: 18px;
   margin-left: 10px;
 }
+
 #globalHeader .logo {
   width: 32px;
   height: 32px;

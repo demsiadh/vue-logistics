@@ -9,6 +9,7 @@ interface UserListPostBody {
   skip: number;
   limit: number;
 }
+
 export const getUserList = (params: UserListPostBody) => {
   return axiosUtil.post("/user/list", { params });
 };
@@ -17,6 +18,7 @@ interface LoginUserQueryParams {
   name: string;
   password: string;
 }
+
 export const loginUser = (params: LoginUserQueryParams) => {
   const formData = convertToFormData(params);
   return axiosUtil.request({

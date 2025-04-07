@@ -38,16 +38,44 @@ const router = createRouter({
   history: createWebHistory(process.env.BASE_URL),
   routes,
 });
+
 router.beforeEach(async (to, from, next) => {
   const userStore = loginUserStore();
   const isLoginPage = to.path === "/login";
+  let isLoggedIn =
+    userStore.loginUser.username !== "" &&
+    localStorage.getItem("logistics_token") !== null;
+  try {
+    // 尝试获取登录用户信息
+    if (!isLoggedIn) {
+      await userStore.getLoginUser();
+      isLoggedIn =
+        userStore.loginUser.username !== "" &&
+        localStorage.getItem("logistics_token") !== null;
+    }
+  } catch (error) {
+    // 如果获取登录用户信息时出错，说明可能未登录，后续会处理
+    console.error("获取登录用户信息时出错:", error);
+  }
 
-  if (userStore.loginUser.value && !isLoginPage) {
+  if (!isLoggedIn && !isLoginPage) {
+    // 用户未登录且访问的不是登录页面，跳转到登录页面
+    message.error("您未登录，请先登录！");
     next("/login");
+    return;
   }
-  if (isLoginPage && userStore.loginUser.value) {
+
+  if (isLoggedIn && isLoginPage) {
+    message.error("您已登录，请勿重复登录！");
+    next("/");
+    return;
+  }
+  if (isLoggedIn && to.path === "/") {
     next("/home");
+    return;
   }
+
+  // 其他情况正常放行
   next();
 });
 export default router;

@@ -31,15 +31,15 @@ axiosUtil.interceptors.response.use(
     const data = response.data as ResponseData;
     console.log(data);
     if (data.code === 70001) {
-      if (!window.location.pathname.includes("/user/login")) {
+      if (!window.location.pathname.includes("/login")) {
         Modal.error({
           title: "操作失败",
           content: "登录已过期，请登录",
-          okText: "确认",
+          okText: "去登录",
           centered: true,
           maskClosable: true,
           onOk() {
-            window.location.href = "/user/login";
+            window.location.href = "/login";
           },
         });
       }

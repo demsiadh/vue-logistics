@@ -19,6 +19,7 @@
 <script setup lang="ts">
 import GlobalHeader from "@/components/GlobalHeader.vue";
 import { loginUser } from "@/api/user";
+
 loginUser({
   name: "lisi",
   password: "lisi",
@@ -38,11 +39,13 @@ loginUser({
   bottom: 0;
   padding: 10px;
 }
+
 #basic .content {
   margin-top: 10px;
   margin-bottom: 30px;
   background: #f5f5f5;
 }
+
 #basic .header {
   background: #fff;
   padding-inline: 20px;

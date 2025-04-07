@@ -45,6 +45,9 @@ router.beforeEach(async (to, from, next) => {
   if (userStore.loginUser.value && !isLoginPage) {
     next("/login");
   }
-  next("/home");
+  if (isLoginPage && userStore.loginUser.value) {
+    next("/home");
+  }
+  next();
 });
 export default router;

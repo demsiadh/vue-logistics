@@ -6,6 +6,7 @@ import LoginLayout from "@/layouts/LoginLayout.vue";
 import BasicLayout from "@/layouts/BasicLayout.vue";
 import { loginUserStore } from "@/store/loginUserStore";
 import { message } from "ant-design-vue";
+import NotFoundView from "@/views/NotFoundView.vue";
 
 const routes: Array<RouteRecordRaw> = [
   // 主页面（需要登录）
@@ -31,6 +32,11 @@ const routes: Array<RouteRecordRaw> = [
     path: ROUTER_CONFIG.LOGIN.PATH,
     name: ROUTER_CONFIG.LOGIN.NAME,
     component: LoginLayout,
+  },
+  {
+    path: "/:pathMatch(.*)*", // 通配符路由（匹配所有未定义路径）
+    name: "NotFound",
+    component: NotFoundView,
   },
 ];
 

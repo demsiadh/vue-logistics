@@ -57,7 +57,7 @@ const items = ref<MenuProps["items"]>([
     title: ROUTER_CONFIG.USER.NAME_CN,
   },
   {
-    key: "alipay",
+    key: ROUTER_CONFIG.PARENT.PATH,
     icon: () => h(GithubOutlined),
     label: h(
       "a",

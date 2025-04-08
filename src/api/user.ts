@@ -11,7 +11,14 @@ interface UserListPostBody {
 }
 
 export const getUserList = (params: UserListPostBody) => {
-  return axiosUtil.post("/user/list", { params });
+  return axiosUtil.request({
+    url: "/user/list",
+    method: "post",
+    data: { params },
+    headers: {
+      logistics_token: localStorage.getItem("logistics_token") || "",
+    },
+  });
 };
 
 interface LoginUserQueryParams {

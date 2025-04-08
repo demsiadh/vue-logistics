@@ -1,34 +1,36 @@
 <template>
   <div id="login-layout">
-    <h1 class="login-title">{{ PROJECT_NAME }}</h1>
-    <a-form
-      :model="loginForm"
-      name="normal_login"
-      class="login-form"
-      @finish="onFinish"
-    >
-      <a-form-item
-        name="name"
-        :rules="[{ required: true, message: '请输入用户名' }]"
+    <div class="login-container">
+      <h1 class="login-title">{{ PROJECT_NAME }}</h1>
+      <a-form
+        :model="loginForm"
+        name="normal_login"
+        class="login-form"
+        @finish="onFinish"
       >
-        <a-input v-model:value="loginForm.name" placeholder="用户名" />
-      </a-form-item>
-      <a-form-item
-        name="password"
-        :rules="[{ required: true, message: '请输入密码' }]"
-      >
-        <a-input-password
-          v-model:value="loginForm.password"
-          placeholder="密码"
-        />
-      </a-form-item>
+        <a-form-item
+          name="name"
+          :rules="[{ required: true, message: '请输入用户名' }]"
+        >
+          <a-input v-model:value="loginForm.name" placeholder="用户名" />
+        </a-form-item>
+        <a-form-item
+          name="password"
+          :rules="[{ required: true, message: '请输入密码' }]"
+        >
+          <a-input-password
+            v-model:value="loginForm.password"
+            placeholder="密码"
+          />
+        </a-form-item>
 
-      <a-form-item>
-        <a-button type="primary" html-type="submit" class="login-form-button">
-          登录
-        </a-button>
-      </a-form-item>
-    </a-form>
+        <a-form-item>
+          <a-button type="primary" html-type="submit" class="login-form-button">
+            登录
+          </a-button>
+        </a-form-item>
+      </a-form>
+    </div>
   </div>
 </template>
 
@@ -62,19 +64,36 @@ const onFinish = () => {
 
 <style scoped>
 #login-layout {
-  margin-top: 400px;
+  height: 100vh; /* 设置页面高度为100% */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
-.login-title {
+
+.login-container {
   text-align: center;
+}
+
+.login-title {
   margin-bottom: 20px;
+  font-size: 24px;
 }
 
 .login-form {
-  max-width: 300px;
-  margin: 100px auto;
+  max-width: 400px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.ant-input {
+  font-size: 16px;
 }
 
 .login-form-button {
   width: 100%;
+  font-size: 16px;
 }
 </style>

@@ -22,6 +22,12 @@ import { PROJECT_NAME } from "@/config/project";
 </script>
 
 <style>
+#basic {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
 #basic .footer {
   text-align: center;
   background: #ffff;
@@ -34,13 +40,18 @@ import { PROJECT_NAME } from "@/config/project";
 }
 
 #basic .content {
-  margin-top: 10px;
+  padding-top: 70px;
   margin-bottom: 30px;
   background: #f5f5f5;
+  flex: 1;
 }
 
 #basic .header {
-  background: #fff;
+  background: #ffff;
   padding-inline: 20px;
+  position: fixed;
+  width: 100%;
+  top: 0;
+  z-index: 1000;
 }
 </style>

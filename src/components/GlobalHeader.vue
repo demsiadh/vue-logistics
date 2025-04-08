@@ -22,8 +22,8 @@
               userStore.loginUser.username ?? "无名"
             }}</span>
             <a-button type="primary" class="logout-btn" @click="logout"
-              >注销</a-button
-            >
+              >注销
+            </a-button>
           </div>
         </div>
       </a-col>
@@ -42,6 +42,7 @@ import { useRouter } from "vue-router";
 import { ROUTER_CONFIG } from "@/config/router";
 import { defaultUser, loginUserStore } from "@/store/loginUserStore";
 import { PROJECT_NAME } from "@/config/project";
+
 const userStore = loginUserStore();
 const items = ref<MenuProps["items"]>([
   {
@@ -79,7 +80,6 @@ const current = ref<string[]>([]);
 // 在组件挂载时，根据当前路由路径设置 current 的值
 onMounted(() => {
   current.value = [router.currentRoute.value.path];
-  console.log(userStore.loginUser.username);
 });
 
 router.afterEach((to) => {

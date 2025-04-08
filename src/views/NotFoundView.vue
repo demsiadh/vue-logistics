@@ -15,7 +15,7 @@ const router = useRouter();
 const goBackHome = () => {
   router.push({
     path: ROUTER_CONFIG.HOME.PATH,
-  }); // 替换为你的首页实际路径
+  });
 };
 </script>
 

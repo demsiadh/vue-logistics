@@ -1,4 +1,5 @@
-# user_center
+# vue-logistics
+基于百度地图API的物流管理系统，主要用来作为毕设项目
 
 ## Project setup
 ```
@@ -20,5 +21,5 @@ npm run build
 npm run lint
 ```
 
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
+### 后端地址
+https://github.com/demsiadh/go-logistics

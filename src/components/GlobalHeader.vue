@@ -32,7 +32,11 @@
 </template>
 <script lang="ts" setup>
 import { h, onMounted, ref } from "vue";
-import { HomeFilled, UserOutlined } from "@ant-design/icons-vue";
+import {
+  HomeFilled,
+  UserOutlined,
+  GithubOutlined,
+} from "@ant-design/icons-vue";
 import { MenuProps, message } from "ant-design-vue";
 import { useRouter } from "vue-router";
 import { ROUTER_CONFIG } from "@/config/router";
@@ -54,12 +58,13 @@ const items = ref<MenuProps["items"]>([
   },
   {
     key: "alipay",
+    icon: () => h(GithubOutlined),
     label: h(
       "a",
-      { href: "https://antdv.com", target: "_blank" },
-      "Navigation Four - Link"
+      { href: "https://github.com/demsiadh/vue-logistics", target: "_blank" },
+      "项目源码"
     ),
-    title: "Navigation Four - Link",
+    title: "项目源码",
   },
 ]);
 // 菜单点击事件

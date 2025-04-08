@@ -9,7 +9,7 @@
       </a-layout-content>
       <a-layout-footer class="footer">
         <a href="https://github.com/demsiadh" target="_blank">
-          领运物流 by demsiadh
+          {{ PROJECT_NAME }} by demsiadh
         </a>
       </a-layout-footer>
     </a-layout>
@@ -18,14 +18,7 @@
 
 <script setup lang="ts">
 import GlobalHeader from "@/components/GlobalHeader.vue";
-import { loginUser } from "@/api/user";
-
-loginUser({
-  name: "lisi",
-  password: "lisi",
-}).then((res) => {
-  console.log(res);
-});
+import { PROJECT_NAME } from "@/config/project";
 </script>
 
 <style>

@@ -1,6 +1,6 @@
 <template>
   <div id="login-layout">
-    <h1 class="login-title">领运物流</h1>
+    <h1 class="login-title">{{ PROJECT_NAME }}</h1>
     <a-form
       :model="loginForm"
       name="normal_login"
@@ -39,6 +39,7 @@ import { loginUserStore } from "@/store/loginUserStore";
 import router from "@/router";
 import { ROUTER_CONFIG } from "@/config/router";
 import { message } from "ant-design-vue";
+import { PROJECT_NAME } from "@/config/project";
 
 const loginForm = reactive({
   name: "",
@@ -60,6 +61,9 @@ const onFinish = () => {
 </script>
 
 <style scoped>
+#login-layout {
+  margin-top: 400px;
+}
 .login-title {
   text-align: center;
   margin-bottom: 20px;

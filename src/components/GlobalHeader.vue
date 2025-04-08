@@ -4,7 +4,7 @@
       <a-col flex="150px">
         <div class="titleBar">
           <img class="logo" src="../assets/logo.png" alt="logo" />
-          <div class="title">领运物流</div>
+          <div class="title">{{ PROJECT_NAME }}</div>
         </div>
       </a-col>
       <a-col flex="auto">
@@ -15,9 +15,16 @@
           @click="doMenuClick"
         />
       </a-col>
-      <a-col flex="80px">
-        <div>
-          {{ loginUser.loginUser.username ?? "无名" }}
+      <a-col flex="200px">
+        <div class="rightBar">
+          <div class="user-info">
+            <span class="username">{{
+              userStore.loginUser.username ?? "无名"
+            }}</span>
+            <a-button type="primary" class="logout-btn" @click="logout"
+              >注销</a-button
+            >
+          </div>
         </div>
       </a-col>
     </a-row>
@@ -26,11 +33,12 @@
 <script lang="ts" setup>
 import { h, onMounted, ref } from "vue";
 import { HomeFilled, UserOutlined } from "@ant-design/icons-vue";
-import { MenuProps } from "ant-design-vue";
+import { MenuProps, message } from "ant-design-vue";
 import { useRouter } from "vue-router";
 import { ROUTER_CONFIG } from "@/config/router";
-import { loginUserStore } from "@/store/loginUserStore";
-const loginUser = loginUserStore();
+import { defaultUser, loginUserStore } from "@/store/loginUserStore";
+import { PROJECT_NAME } from "@/config/project";
+const userStore = loginUserStore();
 const items = ref<MenuProps["items"]>([
   {
     key: ROUTER_CONFIG.HOME.PATH,
@@ -66,11 +74,21 @@ const current = ref<string[]>([]);
 // 在组件挂载时，根据当前路由路径设置 current 的值
 onMounted(() => {
   current.value = [router.currentRoute.value.path];
+  console.log(userStore.loginUser.username);
 });
 
 router.afterEach((to) => {
   current.value = [to.path];
 });
+
+const logout = () => {
+  userStore.loginUser.username = defaultUser.username;
+  localStorage.removeItem("logistics_token");
+  message.success("注销成功");
+  router.push({
+    path: ROUTER_CONFIG.LOGIN.PATH,
+  });
+};
 </script>
 
 <style>
@@ -88,5 +106,30 @@ router.afterEach((to) => {
 #globalHeader .logo {
   width: 32px;
   height: 32px;
+}
+
+#globalHeader .rightBar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+#globalHeader .user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#globalHeader .username {
+  font-size: 14px;
+  color: #333;
+  display: inline-flex;
+  align-items: center;
+}
+
+#globalHeader .logout-btn {
+  height: 32px;
+  padding: 0 16px;
+  font-size: 14px;
 }
 </style>

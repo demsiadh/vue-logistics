@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { getLoginUserStatus } from "@/api/user";
 
-const defaultUser = {
+export const defaultUser = {
   username: "",
 };
 
@@ -35,7 +35,7 @@ export const loginUserStore = defineStore("userLogin", () => {
 
   // 设置登录用户
   function setLoginUser(res: any) {
-    loginUser.value.username = res.data.data.username;
+    loginUser.value.username = res.data.data.name;
     localStorage.setItem("logistics_token", res.headers.get("logistics_token"));
   }
 

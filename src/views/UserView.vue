@@ -57,7 +57,7 @@
         </a-col>
 
         <!-- 操作按钮 -->
-        <a-col :span="4" class="action-col">
+        <a-col :span="6" class="action-col">
           <a-button
             type="primary"
             html-type="submit"
@@ -174,7 +174,7 @@
 import { ref, reactive, onMounted } from "vue";
 import { message } from "ant-design-vue";
 import { USER_STATUS } from "@/config/constants";
-import { getUserList, updateUser, createUser } from "@/api/user";
+import { getUserList, updateUser, createUser, getTotalCount } from "@/api/user";
 
 // 状态配置
 const statusLabels = {
@@ -317,7 +317,13 @@ const getUserListByParams = () => {
         ...item,
         id: (pagination.current - 1) * pagination.pageSize + index + 1,
       }));
-      pagination.total = res.data.total;
+    }
+  });
+  getTotalCount().then((res) => {
+    if (res.data.code === 0) {
+      pagination.total = res.data.data;
+    } else {
+      message.error("获取用户总数失败");
     }
   });
 };

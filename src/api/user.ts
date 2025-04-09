@@ -92,3 +92,14 @@ export const createUser = (params: AddUserDTO) => {
     },
   });
 };
+
+export const getTotalCount = () => {
+  return axiosUtil.request({
+    url: "/user/total",
+    method: "get",
+    params: {},
+    headers: {
+      logistics_token: localStorage.getItem("logistics_token") || "",
+    },
+  });
+};

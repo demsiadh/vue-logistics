@@ -82,6 +82,7 @@
       row-key="id"
       bordered
       style="margin-top: 10px"
+      @change="handleTableChange"
     >
       <template #index="{ index }">
         {{ (pagination.current - 1) * pagination.pageSize + index + 1 }}
@@ -201,10 +202,12 @@ const queryParams = reactive({
 
 // 分页配置
 const pagination = reactive({
-  current: 1, // 添加 current 属性
+  current: 1,
   pageSize: 10,
   showSizeChanger: true,
-  total: 0, // 初始化总条数为0
+  total: 0,
+  showTotal: (total) => `共 ${total} 条`,
+  pageSizeOptions: ["10", "20", "50", "100"],
 });
 
 // 表格列配置
@@ -302,10 +305,12 @@ const handleUpdate = () => {
 const getUserListByParams = () => {
   const params = {
     ...queryParams,
-    skip: (pagination.current - 1) * pagination.pageSize,
+  };
+  const page = {
+    skip: pagination.current,
     limit: pagination.pageSize,
   };
-  getUserList(params).then((res) => {
+  getUserList(params, page).then((res) => {
     if (res.data.code === 0) {
       message.success("查询成功");
       mockData.value = res.data.data.map((item, index) => ({
@@ -410,6 +415,13 @@ const handleAdd = () => {
     .catch((error) => {
       console.error("表单校验失败", error);
     });
+};
+
+// 处理表格变化（分页、排序、筛选）
+const handleTableChange = (pag) => {
+  pagination.current = pag.current;
+  pagination.pageSize = pag.pageSize;
+  getUserListByParams();
 };
 </script>
 

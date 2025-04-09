@@ -1,18 +1,13 @@
 <template>
-  <div class="user-management">
+  <div id="user-management">
     <!-- 增强版查询表单 -->
-    <a-form
-      :model="queryParams"
-      layout="inline"
-      class="search-form"
-      @finish="handleSearch"
-    >
+    <a-form :model="queryParams" layout="inline" class="search-form">
       <a-row :gutter="24">
         <!-- 用户名 -->
         <a-col :span="6">
-          <a-form-item label="用户名" name="username">
+          <a-form-item label="用户名" name="name">
             <a-input
-              v-model:value="queryParams.username"
+              v-model:value="queryParams.name"
               placeholder="支持模糊查询"
             />
           </a-form-item>
@@ -23,7 +18,7 @@
           <a-form-item label="邮箱" name="email">
             <a-input
               v-model:value="queryParams.email"
-              placeholder="完整邮箱地址"
+              placeholder="支持模糊查询"
             />
           </a-form-item>
         </a-col>
@@ -33,12 +28,11 @@
           <a-form-item label="手机号" name="phone">
             <a-input
               v-model:value="queryParams.phone"
-              placeholder="支持部分号码"
+              placeholder="支持模糊查询"
             />
           </a-form-item>
         </a-col>
 
-        <!-- 状态选择（4种状态） -->
         <a-col :span="6">
           <a-form-item label="状态" name="status">
             <a-select
@@ -46,32 +40,36 @@
               placeholder="全部状态"
               allow-clear
             >
-              <a-select-option :value="undefined">全部</a-select-option>
-              <a-select-option :value="0">已禁用</a-select-option>
-              <a-select-option :value="1">已启用</a-select-option>
-              <a-select-option :value="2">待审核</a-select-option>
-              <a-select-option :value="3">已过期</a-select-option>
+              <a-select-option :value="USER_STATUS.ALL.VALUE"
+                >全部
+              </a-select-option>
+              <a-select-option :value="USER_STATUS.ACTIVE.VALUE"
+                >{{ USER_STATUS.ACTIVE.NAME }}
+              </a-select-option>
+              <a-select-option :value="USER_STATUS.BANNED.VALUE"
+                >{{ USER_STATUS.BANNED.NAME }}
+              </a-select-option>
+              <a-select-option :value="USER_STATUS.DELETED.VALUE"
+                >{{ USER_STATUS.DELETED.NAME }}
+              </a-select-option>
             </a-select>
-          </a-form-item>
-        </a-col>
-
-        <!-- 注册时间范围 -->
-        <a-col :span="8">
-          <a-form-item label="注册时间" name="dateRange">
-            <a-range-picker
-              v-model:value="queryParams.dateRange"
-              :disabled-date="disabledDate"
-              style="width: 100%"
-            />
           </a-form-item>
         </a-col>
 
         <!-- 操作按钮 -->
         <a-col :span="4" class="action-col">
-          <a-button type="primary" html-type="submit">查询</a-button>
+          <a-button
+            type="primary"
+            html-type="submit"
+            @click="getUserListByParams"
+            >查询
+          </a-button>
           <a-button style="margin-left: 8px" @click="handleReset"
-            >重置</a-button
-          >
+            >重置
+          </a-button>
+          <a-button style="margin-left: 8px" @click="showAddModal"
+            >添加用户
+          </a-button>
         </a-col>
       </a-row>
     </a-form>
@@ -79,17 +77,12 @@
     <!-- 数据表格 -->
     <a-table
       :columns="columns"
-      :data-source="filteredData"
+      :data-source="mockData"
       :pagination="pagination"
       row-key="id"
       bordered
       style="margin-top: 10px"
-      <!--
-      减少表格与筛选框之间的距离
-      --
     >
-      >
-      <!-- 序号列 -->
       <template #index="{ index }">
         {{ (pagination.current - 1) * pagination.pageSize + index + 1 }}
       </template>
@@ -104,66 +97,114 @@
       <!-- 操作列 -->
       <template #action="{ record }">
         <a-button type="link" @click="showEditModal(record)">编辑</a-button>
-        <a-button
-          type="link"
-          danger
-          @click="handleDelete(record.id)"
-          :disabled="record.status === 2"
-        >
-          删除
-        </a-button>
       </template>
     </a-table>
 
-    <!-- 用户编辑弹窗 -->
-    <!-- 保持原有结构，修改状态选项 -->
+    <!-- 编辑模态框 -->
+    <a-modal
+      v-model:visible="editModalVisible"
+      title="编辑用户信息"
+      @ok="handleUpdate"
+    >
+      <a-form
+        :model="editForm"
+        :rules="rules"
+        ref="editFormRef"
+        layout="vertical"
+      >
+        <a-form-item label="用户名" name="name">
+          <a-input v-model:value="editForm.name" disabled />
+        </a-form-item>
+        <a-form-item label="手机号" name="phone">
+          <a-input v-model:value="editForm.phone" />
+        </a-form-item>
+        <a-form-item label="邮箱" name="email">
+          <a-input v-model:value="editForm.email" />
+        </a-form-item>
+        <a-form-item label="状态" name="status">
+          <a-select v-model:value="editForm.status" placeholder="请选择状态">
+            <a-select-option :value="USER_STATUS.ACTIVE.VALUE"
+              >{{ USER_STATUS.ACTIVE.NAME }}
+            </a-select-option>
+            <a-select-option :value="USER_STATUS.BANNED.VALUE"
+              >{{ USER_STATUS.BANNED.NAME }}
+            </a-select-option>
+            <a-select-option :value="USER_STATUS.DELETED.VALUE"
+              >{{ USER_STATUS.DELETED.NAME }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <!-- 添加用户模态框 -->
+    <a-modal
+      v-model:visible="addModalVisible"
+      title="添加用户信息"
+      @ok="handleAdd"
+    >
+      <a-form
+        :model="addForm"
+        :rules="addRules"
+        ref="addFormRef"
+        layout="vertical"
+      >
+        <a-form-item label="用户名" name="name">
+          <a-input v-model:value="addForm.name" />
+        </a-form-item>
+        <a-form-item label="手机号" name="phone">
+          <a-input v-model:value="addForm.phone" />
+        </a-form-item>
+        <a-form-item label="邮箱" name="email">
+          <a-input v-model:value="addForm.email" />
+        </a-form-item>
+        <a-form-item label="密码" name="password">
+          <a-input-password v-model:value="addForm.password" />
+        </a-form-item>
+        <a-form-item label="确认密码" name="rePassword">
+          <a-input-password v-model:value="addForm.rePassword" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed } from "vue";
-import { message, Modal } from "ant-design-vue";
+import { ref, reactive, onMounted } from "vue";
+import { message } from "ant-design-vue";
+import { USER_STATUS } from "@/config/constants";
+import { getUserList, updateUser, createUser } from "@/api/user";
 
 // 状态配置
 const statusLabels = {
-  0: "已禁用",
-  1: "已启用",
-  2: "待审核",
-  3: "已过期",
+  1: USER_STATUS.ACTIVE.NAME,
+  2: USER_STATUS.BANNED.NAME,
+  3: USER_STATUS.DELETED.NAME,
 };
 
 const statusColors = {
-  0: "red",
-  1: "green",
-  2: "orange",
-  3: "purple",
+  1: USER_STATUS.ACTIVE.COLOR,
+  2: USER_STATUS.BANNED.COLOR,
+  3: USER_STATUS.DELETED.COLOR,
 };
 
-// 增强版示例数据
-const mockData = Array.from({ length: 100 }).map((_, i) => ({
-  id: i + 1,
-  username: `用户_${String(i + 1).padStart(3, "0")}`,
-  email: `user${i + 1}@example.com`,
-  phone: `138${String(i).padStart(4, "0").slice(-4)}5678`,
-  status: i % 4, // 生成0-3的状态
-  createTime: new Date(Date.now() - i * 86400000).toISOString(), // 生成过去100天的日期
-}));
+// 初始化 mockData 为空数组
+const mockData = ref([]);
 
 // 查询参数
 const queryParams = reactive({
-  username: "",
+  name: "",
   email: "",
   phone: "",
-  status: undefined,
-  dateRange: [],
+  status: USER_STATUS.ALL.VALUE,
 });
 
 // 分页配置
 const pagination = reactive({
-  current: 1,
+  current: 1, // 添加 current 属性
   pageSize: 10,
-  total: computed(() => filteredData.value.length),
   showSizeChanger: true,
+  total: 0, // 初始化总条数为0
 });
 
 // 表格列配置
@@ -175,18 +216,13 @@ const columns = [
     customRender: ({ index }) =>
       (pagination.current - 1) * pagination.pageSize + index + 1,
   },
-  { title: "用户名", dataIndex: "username" },
-  { title: "邮箱", dataIndex: "email" },
+  { title: "用户名", dataIndex: "name" },
   { title: "手机号", dataIndex: "phone" },
+  { title: "邮箱", dataIndex: "email" },
   {
     title: "状态",
     dataIndex: "status",
     slots: { customRender: "status" },
-  },
-  {
-    title: "注册时间",
-    dataIndex: "createTime",
-    customRender: ({ text }) => new Date(text).toLocaleDateString(),
   },
   {
     title: "操作",
@@ -195,54 +231,185 @@ const columns = [
   },
 ];
 
-// 数据过滤逻辑
-const filteredData = computed(() => {
-  return mockData.filter((item) => {
-    // 用户名模糊匹配
-    const usernameMatch = item.username
-      .toLowerCase()
-      .includes(queryParams.username.toLowerCase());
-
-    // 邮箱精确匹配
-    const emailMatch = queryParams.email
-      ? item.email === queryParams.email
-      : true;
-
-    // 手机号部分匹配
-    const phoneMatch = queryParams.phone
-      ? item.phone.includes(queryParams.phone)
-      : true;
-
-    // 状态筛选
-    const statusMatch =
-      queryParams.status !== undefined
-        ? item.status === queryParams.status
-        : true;
-
-    // 日期范围筛选
-    const dateMatch =
-      queryParams.dateRange?.length === 2
-        ? new Date(item.createTime) >= queryParams.dateRange[0] &&
-          new Date(item.createTime) <= queryParams.dateRange[1]
-        : true;
-
-    return (
-      usernameMatch && emailMatch && phoneMatch && statusMatch && dateMatch
-    );
-  });
+// 编辑模态框显示控制
+const editModalVisible = ref(false);
+const editForm = reactive({
+  name: "",
+  email: "",
+  phone: "",
+  status: 0,
 });
 
-// 其他方法保持原有逻辑，需要调整状态修改逻辑：
-const handleStatusChange = (id, newStatus) => {
-  Modal.confirm({
-    title: "确认修改状态吗？",
-    content: "请谨慎操作状态变更",
-    onOk: () => {
-      const user = mockData.find((item) => item.id === id);
-      user.status = newStatus;
-      message.success("状态修改成功");
+// 校验规则
+const rules = {
+  email: [
+    { required: true, message: "请输入邮箱", trigger: "blur" },
+    {
+      pattern: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+      message: "请输入有效的邮箱地址",
+      trigger: "blur",
     },
+  ],
+  phone: [
+    { required: true, message: "请输入手机号", trigger: "blur" },
+    {
+      pattern: /^1[3-9]\d{9}$/,
+      message: "请输入有效的手机号",
+      trigger: "blur",
+    },
+  ],
+};
+
+// 显示编辑模态框
+const showEditModal = (record) => {
+  editModalVisible.value = true;
+  // 将状态的数字值转换为对应的中文名称
+  const statusName = statusLabels[record.status];
+  Object.assign(editForm, {
+    ...record,
+    status: statusName,
   });
+};
+
+// 更新用户信息
+const handleUpdate = () => {
+  // 校验表单
+  editFormRef.value
+    .validate()
+    .then(() => {
+      // 将状态的中文名称转换回数字值
+      const statusValue = Object.keys(statusLabels).find(
+        (key) => statusLabels[key] === editForm.status
+      );
+      const updatedUser = {
+        ...editForm,
+        status: parseInt(statusValue, 10),
+      };
+      updateUser(updatedUser).then((res) => {
+        if (res.data.code === 0) {
+          message.success("更新成功");
+          editModalVisible.value = false;
+          getUserListByParams();
+        }
+      });
+    })
+    .catch((error) => {
+      console.error("表单校验失败", error);
+    });
+};
+
+// 获取用户列表
+const getUserListByParams = () => {
+  const params = {
+    ...queryParams,
+    skip: (pagination.current - 1) * pagination.pageSize,
+    limit: pagination.pageSize,
+  };
+  getUserList(params).then((res) => {
+    if (res.data.code === 0) {
+      message.success("查询成功");
+      mockData.value = res.data.data.map((item, index) => ({
+        ...item,
+        id: (pagination.current - 1) * pagination.pageSize + index + 1,
+      }));
+      pagination.total = res.data.total;
+    }
+  });
+};
+
+// 重置表单
+const handleReset = () => {
+  queryParams.name = "";
+  queryParams.email = "";
+  queryParams.phone = "";
+  queryParams.status = USER_STATUS.ALL.VALUE;
+  pagination.current = 1; // 重置分页到第一页
+  pagination.limit = 10;
+  getUserListByParams(); // 重新获取用户列表
+};
+
+// 组件挂载时获取用户列表
+onMounted(() => {
+  getUserListByParams();
+});
+
+// 表单引用
+const editFormRef = ref(null);
+const addFormRef = ref(null); // 声明 addFormRef
+
+// 添加用户模态框显示控制
+const addModalVisible = ref(false);
+const addForm = reactive({
+  name: "",
+  email: "",
+  phone: "",
+  password: "",
+  rePassword: "",
+});
+// 确认密码校验
+const validateConfirmPassword = (rule, value) => {
+  if (value !== addForm.password) {
+    message.error("密码和确认密码不一致");
+    return Promise.reject("密码和确认密码不一致");
+  }
+  return Promise.resolve();
+};
+
+// 添加用户校验规则
+const addRules = {
+  name: [{ required: true, message: "请输入用户名", trigger: "blur" }],
+  email: [
+    { required: true, message: "请输入邮箱", trigger: "blur" },
+    {
+      pattern: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+      message: "请输入有效的邮箱地址",
+      trigger: "blur",
+    },
+  ],
+  phone: [
+    { required: true, message: "请输入手机号", trigger: "blur" },
+    {
+      pattern: /^1[3-9]\d{9}$/,
+      message: "请输入有效的手机号",
+      trigger: "blur",
+    },
+  ],
+  password: [{ required: true, message: "请输入密码", trigger: "blur" }],
+  rePassword: [
+    { required: true, message: "请输入确认密码", trigger: "blur" },
+    { validator: validateConfirmPassword, trigger: "blur" },
+  ],
+};
+
+// 显示添加用户模态框
+const showAddModal = () => {
+  addModalVisible.value = true;
+  Object.assign(addForm, {
+    name: "",
+    email: "",
+    phone: "",
+    password: "",
+    rePassword: "",
+  });
+};
+
+// 添加用户
+const handleAdd = () => {
+  // 校验表单
+  addFormRef.value // 确保这里引用正确
+    .validate()
+    .then(() => {
+      createUser({ ...addForm }).then((res) => {
+        if (res.data.code === 0) {
+          message.success("添加成功");
+          addModalVisible.value = false;
+          getUserListByParams();
+        }
+      });
+    })
+    .catch((error) => {
+      console.error("表单校验失败", error);
+    });
 };
 </script>
 
@@ -259,6 +426,15 @@ const handleStatusChange = (id, newStatus) => {
   transform: scale(1.05);
 }
 
+.ant-row {
+  width: 100%;
+  margin: 0;
+}
+
+.ant-col {
+  box-sizing: border-box;
+}
+
 /* 确保表格和表单不超出宽度 */
 .user-management {
   width: 100%;
@@ -269,15 +445,6 @@ const handleStatusChange = (id, newStatus) => {
 .search-form {
   width: 100%;
   margin-bottom: 20px;
-}
-
-.ant-row {
-  width: 100%;
-  margin: 0;
-}
-
-.ant-col {
-  box-sizing: border-box;
 }
 
 /* 添加 a-form-item 之间的垂直间距 */

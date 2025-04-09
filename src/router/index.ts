@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
 import HomeView from "@/views/HomeView.vue";
 import UserView from "@/views/UserView.vue";
-import { ROUTER_CONFIG } from "@/config/router";
+import { ROUTER_CONFIG } from "@/config/constants";
 import LoginLayout from "@/layouts/LoginLayout.vue";
 import BasicLayout from "@/layouts/BasicLayout.vue";
 import { loginUserStore } from "@/store/loginUserStore";

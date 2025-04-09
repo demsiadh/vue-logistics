@@ -8,7 +8,7 @@
 
 <script setup>
 import { useRouter } from "vue-router";
-import { ROUTER_CONFIG } from "@/config/router";
+import { ROUTER_CONFIG } from "@/config/constants";
 
 const router = useRouter();
 

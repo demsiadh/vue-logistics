@@ -39,7 +39,7 @@ import { reactive } from "vue";
 import { loginUser } from "@/api/user";
 import { loginUserStore } from "@/store/loginUserStore";
 import router from "@/router";
-import { ROUTER_CONFIG } from "@/config/router";
+import { ROUTER_CONFIG } from "@/config/constants";
 import { message } from "ant-design-vue";
 import { PROJECT_NAME } from "@/config/project";
 

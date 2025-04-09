@@ -26,3 +26,32 @@ export const ROUTER_CONFIG: Record<string, RouterConfig> = {
     NAME_CN: "登录",
   },
 };
+
+interface UserStatus {
+  VALUE: number;
+  NAME: string;
+  COLOR: string;
+}
+
+export const USER_STATUS: Record<string, UserStatus> = {
+  ALL: {
+    VALUE: 0,
+    NAME: "全部",
+    COLOR: "null",
+  },
+  ACTIVE: {
+    VALUE: 1,
+    NAME: "活跃",
+    COLOR: "green",
+  },
+  BANNED: {
+    VALUE: 2,
+    NAME: "禁用",
+    COLOR: "red",
+  },
+  DELETED: {
+    VALUE: 3,
+    NAME: "删除",
+    COLOR: "gray",
+  },
+};

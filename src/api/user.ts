@@ -6,15 +6,26 @@ interface UserListPostBody {
   phone: string;
   email: string;
   status: number;
+}
+
+// Page 分页参数结构体
+interface Page {
   skip: number;
   limit: number;
 }
 
-export const getUserList = (params: UserListPostBody) => {
+export const getUserList = (params: UserListPostBody, page: Page) => {
+  console.log(params);
+  console.log(page);
   return axiosUtil.request({
     url: "/user/list",
     method: "post",
-    data: { params },
+    data: {
+      ...params,
+      page: {
+        ...page,
+      },
+    },
     headers: {
       logistics_token: localStorage.getItem("logistics_token") || "",
     },
@@ -44,6 +55,39 @@ export const getLoginUserStatus = () => {
     method: "get",
     params: {},
     headers: {
+      logistics_token: localStorage.getItem("logistics_token") || "",
+    },
+  });
+};
+
+export const updateUser = (params: UserListPostBody) => {
+  const formData = convertToFormData(params);
+  return axiosUtil.request({
+    url: "/user/update",
+    method: "put",
+    data: formData,
+    headers: {
+      "Content-Type": "multipart/form-data",
+      logistics_token: localStorage.getItem("logistics_token") || "",
+    },
+  });
+};
+
+interface AddUserDTO {
+  name: string;
+  phone: string;
+  email: string;
+  password: string;
+  rePassword: string;
+}
+export const createUser = (params: AddUserDTO) => {
+  const formData = convertToFormData(params);
+  return axiosUtil.request({
+    url: "/user/create",
+    method: "post",
+    data: formData,
+    headers: {
+      "Content-Type": "multipart/form-data",
       logistics_token: localStorage.getItem("logistics_token") || "",
     },
   });

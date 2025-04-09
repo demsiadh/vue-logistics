@@ -39,7 +39,7 @@ import {
 } from "@ant-design/icons-vue";
 import { MenuProps, message } from "ant-design-vue";
 import { useRouter } from "vue-router";
-import { ROUTER_CONFIG } from "@/config/router";
+import { ROUTER_CONFIG } from "@/config/constants";
 import { defaultUser, loginUserStore } from "@/store/loginUserStore";
 import { PROJECT_NAME } from "@/config/project";
 

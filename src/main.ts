@@ -6,7 +6,6 @@ import router from "./router";
 import "ant-design-vue/dist/reset.css";
 import BaiduMap from "vue-baidu-map-3x";
 import VChart from "vue-echarts";
-import * as echarts from "echarts";
 import { use } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { LineChart, BarChart, PieChart } from "echarts/charts";

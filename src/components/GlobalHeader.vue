@@ -10,6 +10,7 @@
       <a-col flex="auto">
         <a-menu
           v-model:selectedKeys="current"
+          v-model:openKeys="openKeys"
           mode="horizontal"
           :items="items"
           @click="doMenuClick"
@@ -37,6 +38,8 @@ import {
   UserOutlined,
   GithubOutlined,
   OrderedListOutlined,
+  CarOutlined,
+  EnvironmentOutlined,
 } from "@ant-design/icons-vue";
 import { MenuProps, message } from "ant-design-vue";
 import { useRouter } from "vue-router";
@@ -65,6 +68,26 @@ const items = ref<MenuProps["items"]>([
     title: ROUTER_CONFIG.ORDER.NAME_CN,
   },
   {
+    key: "vehicle",
+    icon: () => h(CarOutlined),
+    label: "车辆管理",
+    title: "车辆管理",
+    children: [
+      {
+        key: ROUTER_CONFIG.VEHICLE.PATH,
+        icon: () => h(CarOutlined),
+        label: ROUTER_CONFIG.VEHICLE.NAME_CN,
+        title: ROUTER_CONFIG.VEHICLE.NAME_CN,
+      },
+      {
+        key: ROUTER_CONFIG.FENCE.PATH,
+        icon: () => h(EnvironmentOutlined),
+        label: ROUTER_CONFIG.FENCE.NAME_CN,
+        title: ROUTER_CONFIG.FENCE.NAME_CN,
+      },
+    ],
+  },
+  {
     key: ROUTER_CONFIG.PARENT.PATH,
     icon: () => h(GithubOutlined),
     label: h(
@@ -75,6 +98,7 @@ const items = ref<MenuProps["items"]>([
     title: "项目源码",
   },
 ]);
+
 // 菜单点击事件
 const router = useRouter();
 const doMenuClick = ({ key }: { key: string }) => {
@@ -82,15 +106,28 @@ const doMenuClick = ({ key }: { key: string }) => {
     path: key,
   });
 };
+
 const current = ref<string[]>([]);
+const openKeys = ref<string[]>([]);
 
 // 在组件挂载时，根据当前路由路径设置 current 的值
 onMounted(() => {
-  current.value = [router.currentRoute.value.path];
+  const path = router.currentRoute.value.path;
+  current.value = [path];
+  // 如果是子菜单，设置父菜单为展开状态
+  if (path.startsWith("/vehicle/")) {
+    openKeys.value = ["vehicle"];
+  }
 });
 
 router.afterEach((to) => {
   current.value = [to.path];
+  // 如果是子菜单，设置父菜单为展开状态
+  if (to.path.startsWith("/vehicle/")) {
+    openKeys.value = ["vehicle"];
+  } else {
+    openKeys.value = [];
+  }
 });
 
 const logout = () => {
@@ -143,5 +180,15 @@ const logout = () => {
   height: 32px;
   padding: 0 16px;
   font-size: 14px;
+}
+
+:deep(.ant-menu-submenu-title) {
+  display: flex;
+  align-items: center;
+}
+
+:deep(.ant-menu-item) {
+  display: flex;
+  align-items: center;
 }
 </style>

@@ -2,6 +2,8 @@ import { createRouter, createWebHistory, RouteRecordRaw } from "vue-router";
 import HomeView from "@/views/HomeView.vue";
 import UserView from "@/views/UserView.vue";
 import OrderView from "@/views/OrderView.vue";
+import VehicleView from "@/views/VehicleView.vue";
+import FenceView from "@/views/FenceView.vue";
 import { ROUTER_CONFIG } from "@/config/constants";
 import LoginLayout from "@/layouts/LoginLayout.vue";
 import BasicLayout from "@/layouts/BasicLayout.vue";
@@ -30,6 +32,16 @@ const routes: Array<RouteRecordRaw> = [
         path: ROUTER_CONFIG.ORDER.PATH,
         name: ROUTER_CONFIG.ORDER.NAME,
         component: OrderView,
+      },
+      {
+        path: ROUTER_CONFIG.VEHICLE.PATH,
+        name: ROUTER_CONFIG.VEHICLE.NAME,
+        component: VehicleView,
+      },
+      {
+        path: ROUTER_CONFIG.FENCE.PATH,
+        name: ROUTER_CONFIG.FENCE.NAME,
+        component: FenceView,
       },
     ],
   },

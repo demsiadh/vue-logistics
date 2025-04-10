@@ -3,7 +3,7 @@
     <a-row :gutter="[16, 16]" class="dashboard-container">
       <!-- 地图区域 -->
       <a-col :span="12">
-        <a-card title="物流配送地图" :bordered="false">
+        <a-card title="营业网点分布" :bordered="false">
           <div class="map-container">
             <baidu-map
               class="bmap"
@@ -12,14 +12,25 @@
               :scroll-wheel-zoom="true"
             >
               <bm-marker
-                :position="center"
-                :dragging="true"
-                animation="BMAP_ANIMATION_BOUNCE"
+                v-for="point in branchPoints"
+                :key="point.id"
+                :position="{ lng: point.lng, lat: point.lat }"
+                :dragging="false"
+                animation="BMAP_ANIMATION_DROP"
+                @click="showBranchInfo(point)"
               >
                 <bm-info-window
-                  :content="infoWindowContent"
-                  :title="infoWindowTitle"
-                />
+                  :show="point.id === selectedBranch?.id"
+                  @close="closeInfoWindow"
+                  @open="infoWindowOpen"
+                >
+                  <div class="branch-info">
+                    <h4>{{ point.name }}</h4>
+                    <p>地址：{{ point.address }}</p>
+                    <p>电话：{{ point.phone }}</p>
+                    <p>营业时间：{{ point.businessHours }}</p>
+                  </div>
+                </bm-info-window>
               </bm-marker>
             </baidu-map>
           </div>
@@ -40,10 +51,10 @@
         </a-card>
       </a-col>
 
-      <!-- 仓库库存统计 -->
+      <!-- 营业网点统计 -->
       <a-col :span="12">
-        <a-card title="仓库库存统计" :bordered="false">
-          <v-chart class="chart" :option="warehouseChartOption" />
+        <a-card title="营业网点统计" :bordered="false">
+          <v-chart class="chart" :option="branchChartOption" />
         </a-card>
       </a-col>
     </a-row>
@@ -59,13 +70,99 @@ import * as echarts from "echarts";
 
 const router = useRouter();
 
-// 地图中心点
-const center = ref({ lng: 116.404, lat: 39.915 });
-const zoom = ref(15);
+// 地图中心点（设置在全国中心位置）
+const center = ref({ lng: 116.404, lat: 35.915 });
+const zoom = ref(5);
 
-// 信息窗口内容
-const infoWindowTitle = ref("北京总部");
-const infoWindowContent = ref("这里是领运物流的总部");
+// 营业网点数据结构
+interface BranchPoint {
+  id: string;
+  name: string;
+  lng: number;
+  lat: number;
+  address: string;
+  phone: string;
+  businessHours: string;
+  dailyOrders: number;
+  serviceArea: number;
+}
+
+// 模拟营业网点数据
+const branchPoints = ref<BranchPoint[]>([
+  {
+    id: "BJ001",
+    name: "北京总部",
+    lng: 116.404,
+    lat: 39.915,
+    address: "北京市朝阳区建国路88号",
+    phone: "010-12345678",
+    businessHours: "09:00-18:00",
+    dailyOrders: 200,
+    serviceArea: 5000,
+  },
+  {
+    id: "SH001",
+    name: "上海分部",
+    lng: 121.473,
+    lat: 31.23,
+    address: "上海市浦东新区陆家嘴西路88号",
+    phone: "021-12345678",
+    businessHours: "09:00-18:00",
+    dailyOrders: 180,
+    serviceArea: 4500,
+  },
+  {
+    id: "GZ001",
+    name: "广州分部",
+    lng: 113.264,
+    lat: 23.129,
+    address: "广州市天河区珠江新城88号",
+    phone: "020-12345678",
+    businessHours: "09:00-18:00",
+    dailyOrders: 150,
+    serviceArea: 4000,
+  },
+  {
+    id: "CD001",
+    name: "成都分部",
+    lng: 104.065,
+    lat: 30.659,
+    address: "成都市武侯区天府大道88号",
+    phone: "028-12345678",
+    businessHours: "09:00-18:00",
+    dailyOrders: 120,
+    serviceArea: 3500,
+  },
+  {
+    id: "SZ001",
+    name: "深圳分部",
+    lng: 114.057,
+    lat: 22.543,
+    address: "深圳市南山区科技园88号",
+    phone: "0755-12345678",
+    businessHours: "09:00-18:00",
+    dailyOrders: 140,
+    serviceArea: 3800,
+  },
+]);
+
+// 选中的营业网点
+const selectedBranch = ref<BranchPoint | null>(null);
+
+// 显示网点信息
+const showBranchInfo = (point: BranchPoint) => {
+  selectedBranch.value = point;
+};
+
+// 关闭信息窗口
+const closeInfoWindow = () => {
+  selectedBranch.value = null;
+};
+
+// 信息窗口打开回调
+const infoWindowOpen = () => {
+  console.log("信息窗口打开");
+};
 
 // 订单统计数据结构
 interface OrderStatistics {
@@ -238,77 +335,8 @@ const vehicleChartOption = ref({
   ],
 });
 
-// 仓库库存数据结构
-interface WarehouseInventory {
-  warehouseId: string;
-  warehouseName: string;
-  totalCapacity: number;
-  currentStock: number;
-  utilizationRate: number;
-  categories: {
-    category: string;
-    quantity: number;
-  }[];
-}
-
-// 模拟仓库库存数据
-const warehouseInventoryData = ref<WarehouseInventory[]>([
-  {
-    warehouseId: "BJ001",
-    warehouseName: "北京仓",
-    totalCapacity: 1000,
-    currentStock: 850,
-    utilizationRate: 85,
-    categories: [
-      { category: "电子产品", quantity: 300 },
-      { category: "服装", quantity: 250 },
-      { category: "食品", quantity: 200 },
-      { category: "其他", quantity: 100 },
-    ],
-  },
-  {
-    warehouseId: "SH001",
-    warehouseName: "上海仓",
-    totalCapacity: 1200,
-    currentStock: 980,
-    utilizationRate: 82,
-    categories: [
-      { category: "电子产品", quantity: 400 },
-      { category: "服装", quantity: 300 },
-      { category: "食品", quantity: 180 },
-      { category: "其他", quantity: 100 },
-    ],
-  },
-  {
-    warehouseId: "GZ001",
-    warehouseName: "广州仓",
-    totalCapacity: 800,
-    currentStock: 720,
-    utilizationRate: 90,
-    categories: [
-      { category: "电子产品", quantity: 250 },
-      { category: "服装", quantity: 200 },
-      { category: "食品", quantity: 170 },
-      { category: "其他", quantity: 100 },
-    ],
-  },
-  {
-    warehouseId: "SZ001",
-    warehouseName: "深圳仓",
-    totalCapacity: 900,
-    currentStock: 810,
-    utilizationRate: 90,
-    categories: [
-      { category: "电子产品", quantity: 350 },
-      { category: "服装", quantity: 200 },
-      { category: "食品", quantity: 160 },
-      { category: "其他", quantity: 100 },
-    ],
-  },
-]);
-
-// 仓库库存统计图表配置
-const warehouseChartOption = ref({
+// 营业网点统计图表配置
+const branchChartOption = ref({
   tooltip: {
     trigger: "axis",
     axisPointer: {
@@ -316,7 +344,7 @@ const warehouseChartOption = ref({
     },
   },
   legend: {
-    data: ["总容量", "当前库存", "利用率"],
+    data: ["日均订单", "服务面积(㎡)"],
   },
   grid: {
     left: "3%",
@@ -326,45 +354,34 @@ const warehouseChartOption = ref({
   },
   xAxis: {
     type: "category",
-    data: warehouseInventoryData.value.map((item) => item.warehouseName),
+    data: branchPoints.value.map((item) => item.name),
   },
   yAxis: [
     {
       type: "value",
-      name: "数量",
+      name: "订单数",
       position: "left",
     },
     {
       type: "value",
-      name: "利用率(%)",
+      name: "面积(㎡)",
       position: "right",
-      max: 100,
     },
   ],
   series: [
     {
-      name: "总容量",
+      name: "日均订单",
       type: "bar",
-      data: warehouseInventoryData.value.map((item) => item.totalCapacity),
+      data: branchPoints.value.map((item) => item.dailyOrders),
     },
     {
-      name: "当前库存",
-      type: "bar",
-      data: warehouseInventoryData.value.map((item) => item.currentStock),
-    },
-    {
-      name: "利用率",
+      name: "服务面积(㎡)",
       type: "line",
       yAxisIndex: 1,
-      data: warehouseInventoryData.value.map((item) => item.utilizationRate),
+      data: branchPoints.value.map((item) => item.serviceArea),
     },
   ],
 });
-
-// 统计数据
-const orderCount = ref(1234);
-const vehicleCount = ref(56);
-const warehouseCount = ref(10);
 </script>
 
 <style scoped>
@@ -400,8 +417,8 @@ const warehouseCount = ref(10);
 }
 
 .bmap {
-  width: 90%;
-  height: 90%;
+  width: 100%;
+  height: 100%;
 }
 
 .chart {
@@ -426,5 +443,20 @@ const warehouseCount = ref(10);
 
 :deep(.ant-col) {
   padding: 0 !important;
+}
+
+.branch-info {
+  padding: 8px;
+  max-width: 300px;
+}
+
+.branch-info h4 {
+  margin: 0 0 8px 0;
+  color: #1890ff;
+}
+
+.branch-info p {
+  margin: 4px 0;
+  font-size: 14px;
 }
 </style>

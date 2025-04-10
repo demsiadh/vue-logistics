@@ -7,4 +7,10 @@ module.exports = defineConfig({
     },
     port: 3000,
   },
+  chainWebpack: (config) => {
+    config.plugin("html").tap((args) => {
+      args[0].title = "领运物流";
+      return args;
+    });
+  },
 });

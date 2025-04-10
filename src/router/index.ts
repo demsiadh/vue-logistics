@@ -52,6 +52,9 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to, from, next) => {
+  // 设置页面标题
+  document.title = "领运物流";
+
   const userStore = loginUserStore();
   const isLoginPage = to.path === "/login";
   let isLoggedIn =

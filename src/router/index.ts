@@ -65,7 +65,7 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   // 设置页面标题
-  document.title = "领运物流";
+  document.title = "vue-logistics";
 
   const userStore = loginUserStore();
   const isLoginPage = to.path === "/login";

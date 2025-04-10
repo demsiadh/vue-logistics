@@ -103,3 +103,14 @@ export const getTotalCount = () => {
     },
   });
 };
+
+export const deleteUser = (params: { name: string }) => {
+  return axiosUtil.request({
+    url: "/user/delete",
+    method: "delete",
+    params: params,
+    headers: {
+      logistics_token: localStorage.getItem("logistics_token") || "",
+    },
+  });
+};

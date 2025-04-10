@@ -20,6 +20,11 @@ export const ROUTER_CONFIG: Record<string, RouterConfig> = {
     NAME: "user",
     NAME_CN: "用户管理",
   },
+  ORDER: {
+    PATH: "/order",
+    NAME: "order",
+    NAME_CN: "订单管理",
+  },
   LOGIN: {
     PATH: "/login",
     NAME: "login",

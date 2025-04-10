@@ -36,6 +36,7 @@ import {
   HomeFilled,
   UserOutlined,
   GithubOutlined,
+  OrderedListOutlined,
 } from "@ant-design/icons-vue";
 import { MenuProps, message } from "ant-design-vue";
 import { useRouter } from "vue-router";
@@ -56,6 +57,12 @@ const items = ref<MenuProps["items"]>([
     icon: () => h(UserOutlined),
     label: ROUTER_CONFIG.USER.NAME_CN,
     title: ROUTER_CONFIG.USER.NAME_CN,
+  },
+  {
+    key: ROUTER_CONFIG.ORDER.PATH,
+    icon: () => h(OrderedListOutlined),
+    label: ROUTER_CONFIG.ORDER.NAME_CN,
+    title: ROUTER_CONFIG.ORDER.NAME_CN,
   },
   {
     key: ROUTER_CONFIG.PARENT.PATH,

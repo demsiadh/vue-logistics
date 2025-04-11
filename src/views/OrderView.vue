@@ -9,6 +9,12 @@
             placeholder="请输入订单编号"
           />
         </a-form-item>
+        <a-form-item label="手机号">
+          <a-input
+            v-model:value="searchForm.phone"
+            placeholder="请输入客户手机号"
+          />
+        </a-form-item>
         <a-form-item label="订单状态">
           <a-select
             v-model:value="searchForm.status"
@@ -137,12 +143,14 @@ interface Order {
 // 搜索表单数据
 interface SearchForm {
   orderId: string;
+  phone: string;
   status: string;
   dateRange: [Dayjs, Dayjs] | [];
 }
 
 const searchForm = reactive<SearchForm>({
   orderId: "",
+  phone: "",
   status: "",
   dateRange: [],
 });
@@ -214,6 +222,7 @@ const fetchOrderList = async () => {
       page: pagination.current || 1,
       pageSize: pagination.pageSize || 10,
       orderId: searchForm.orderId || undefined,
+      phone: searchForm.phone || undefined,
       status: searchForm.status || undefined,
       startDate: searchForm.dateRange[0]?.format("YYYY-MM-DD"),
       endDate: searchForm.dateRange[1]?.format("YYYY-MM-DD"),
@@ -251,6 +260,11 @@ const fetchOrderList = async () => {
     if (params.orderId) {
       filteredData = filteredData.filter((item) =>
         item.orderId.includes(params.orderId!)
+      );
+    }
+    if (params.phone) {
+      filteredData = filteredData.filter((item) =>
+        item.phone.includes(params.phone!)
       );
     }
     if (params.status) {
@@ -311,6 +325,7 @@ const handleSearch = () => {
 const resetSearch = () => {
   Object.assign(searchForm, {
     orderId: "",
+    phone: "",
     status: "",
     dateRange: [],
   });

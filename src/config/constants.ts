@@ -36,7 +36,7 @@ export const ROUTER_CONFIG: Record<string, RouterConfig> = {
     NAME_CN: "电子围栏",
   },
   OUTLET: {
-    PATH: "/vehicle/outlet",
+    PATH: "/outlet",
     NAME: "outlet",
     NAME_CN: "营业网点",
   },

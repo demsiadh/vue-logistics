@@ -4,12 +4,14 @@ import UserView from "@/views/UserView.vue";
 import OrderView from "@/views/OrderView.vue";
 import VehicleView from "@/views/VehicleView.vue";
 import FenceView from "@/views/FenceView.vue";
+import OutletView from "@/views/OutletView.vue";
 import { ROUTER_CONFIG } from "@/config/constants";
 import LoginLayout from "@/layouts/LoginLayout.vue";
 import BasicLayout from "@/layouts/BasicLayout.vue";
 import { loginUserStore } from "@/store/loginUserStore";
 import { message } from "ant-design-vue";
 import NotFoundView from "@/views/NotFoundView.vue";
+import { PROJECT_NAME } from "@/config/project";
 
 const routes: Array<RouteRecordRaw> = [
   // 主页面（需要登录）
@@ -43,6 +45,11 @@ const routes: Array<RouteRecordRaw> = [
         name: ROUTER_CONFIG.FENCE.NAME,
         component: FenceView,
       },
+      {
+        path: ROUTER_CONFIG.OUTLET.PATH,
+        name: ROUTER_CONFIG.OUTLET.NAME,
+        component: OutletView,
+      },
     ],
   },
   // 不需要登录的页面
@@ -65,7 +72,7 @@ const router = createRouter({
 
 router.beforeEach(async (to, from, next) => {
   // 设置页面标题
-  document.title = "vue-logistics";
+  document.title = PROJECT_NAME;
 
   const userStore = loginUserStore();
   const isLoginPage = to.path === "/login";

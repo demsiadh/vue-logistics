@@ -60,6 +60,9 @@
         <template v-if="column.key === 'type'">
           {{ getVehicleTypeText(record.type) }}
         </template>
+        <template v-if="column.key === 'fenceName'">
+          {{ record.fenceName || "未绑定围栏" }}
+        </template>
         <template v-if="column.key === 'action'">
           <a-space>
             <a @click="showEditModal(record)">编辑</a>
@@ -115,16 +118,104 @@
             <a-select-option value="空闲">空闲</a-select-option>
           </a-select>
         </a-form-item>
+        <a-form-item label="关联围栏" name="fenceId">
+          <a-select
+            v-model:value="vehicleForm.fenceId"
+            placeholder="请选择围栏"
+            allow-clear
+            @change="handleFenceChange"
+          >
+            <a-select-option
+              v-for="option in fenceOptions"
+              :key="option.value"
+              :value="option.value"
+            >
+              {{ option.label }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
       </a-form>
+    </a-modal>
+
+    <!-- 围栏预览弹窗 -->
+    <a-modal
+      title="围栏预览"
+      v-model:visible="showMapPreview"
+      width="800px"
+      :footer="null"
+      @cancel="showMapPreview = false"
+    >
+      <div style="height: 400px">
+        <baidu-map
+          class="map-container"
+          :center="mapCenter"
+          :zoom="mapZoom"
+          :scroll-wheel-zoom="true"
+          style="height: 100%; width: 100%"
+        >
+          <bm-polygon
+            v-if="selectedFenceDetails && selectedFenceDetails.points"
+            :path="selectedFenceDetails.points"
+            stroke-color="#3388ff"
+            :stroke-opacity="0.8"
+            :stroke-weight="2"
+            fill-color="#3388ff"
+            :fill-opacity="0.3"
+          ></bm-polygon>
+          <bm-marker
+            :position="mapCenter"
+            :dragging="false"
+            animation="BMAP_ANIMATION_BOUNCE"
+          ></bm-marker>
+          <bm-navigation anchor="BMAP_ANCHOR_TOP_LEFT"></bm-navigation>
+          <bm-scale anchor="BMAP_ANCHOR_BOTTOM_LEFT"></bm-scale>
+        </baidu-map>
+      </div>
+      <div
+        style="
+          margin-top: 10px;
+          padding: 10px;
+          background-color: #f9f9f9;
+          border-radius: 4px;
+        "
+      >
+        <p style="margin-bottom: 5px">
+          <strong>围栏名称:</strong> {{ selectedFenceDetails?.name }}
+        </p>
+        <p style="margin-bottom: 0">
+          <strong>围栏备注:</strong> {{ selectedFenceDetails?.remark }}
+        </p>
+      </div>
     </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from "vue";
+import { ref, reactive, onMounted } from "vue";
 import { message } from "ant-design-vue";
-import { PlusOutlined } from "@ant-design/icons-vue";
+import { PlusOutlined, EnvironmentOutlined } from "@ant-design/icons-vue";
 import type { TablePaginationConfig } from "ant-design-vue";
+import {
+  BaiduMap,
+  BmMarker,
+  BmPolygon,
+  BmNavigation,
+  BmScale,
+} from "vue-baidu-map-3x";
+
+interface Point {
+  lng: number;
+  lat: number;
+}
+
+interface Fence {
+  id: string;
+  name: string;
+  type: string;
+  points: Point[];
+  status: string;
+  remark: string;
+}
 
 // 定义车辆接口
 interface Vehicle {
@@ -133,6 +224,8 @@ interface Vehicle {
   type: string;
   loadCapacity: number;
   status: string;
+  fenceId?: string; // 关联的围栏ID
+  fenceName?: string; // 关联的围栏名称
 }
 
 // 搜索表单数据
@@ -160,6 +253,14 @@ const columns = [
     key: "loadCapacity",
   },
   {
+    title: "所属围栏",
+    dataIndex: "fenceName",
+    key: "fenceName",
+    customRender: ({ text, record }: { text: string; record: Vehicle }) => {
+      return text || "未绑定围栏";
+    },
+  },
+  {
     title: "状态",
     dataIndex: "status",
     key: "status",
@@ -168,7 +269,7 @@ const columns = [
     title: "操作",
     key: "action",
     fixed: "right",
-    width: 150,
+    width: 200,
   },
 ];
 
@@ -199,6 +300,76 @@ const vehicleForm = reactive<Vehicle>({
   type: "",
   loadCapacity: 0,
   status: "空闲",
+  fenceId: "",
+  fenceName: "",
+});
+
+// 定义全局变量类型
+declare global {
+  interface Window {
+    mockFences: any[];
+  }
+}
+
+// 围栏选择相关
+const fenceOptions = ref<{ value: string; label: string }[]>([]);
+const selectedFenceDetails = ref<Fence | null>(null);
+const mockFences: Fence[] = [
+  {
+    id: "1",
+    name: "仓库A区域围栏",
+    type: "polygon",
+    points: [
+      { lng: 116.403, lat: 39.915 },
+      { lng: 116.41, lat: 39.917 },
+      { lng: 116.415, lat: 39.91 },
+      { lng: 116.405, lat: 39.907 },
+    ],
+    status: "active",
+    remark: "仓库A区域围栏范围",
+  },
+  {
+    id: "2",
+    name: "配送网点B区域",
+    type: "polygon",
+    points: [
+      { lng: 116.433, lat: 39.935 },
+      { lng: 116.443, lat: 39.937 },
+      { lng: 116.453, lat: 39.93 },
+      { lng: 116.443, lat: 39.927 },
+      { lng: 116.433, lat: 39.932 },
+    ],
+    status: "inactive",
+    remark: "配送网点B区域围栏",
+  },
+  {
+    id: "3",
+    name: "商场C区域围栏",
+    type: "polygon",
+    points: [
+      { lng: 116.323, lat: 39.985 },
+      { lng: 116.333, lat: 39.987 },
+      { lng: 116.343, lat: 39.98 },
+      { lng: 116.333, lat: 39.977 },
+    ],
+    status: "active",
+    remark: "商场C区域电子围栏",
+  },
+];
+
+const fetchFenceList = () => {
+  // 只获取状态为启用的围栏作为选项
+  fenceOptions.value = mockFences
+    .filter((fence) => fence.status === "active")
+    .map((fence) => ({
+      value: fence.id,
+      label: fence.name,
+    }));
+};
+
+// 在组件初始化时获取围栏列表
+onMounted(() => {
+  fetchFenceList();
 });
 
 // 表单验证规则
@@ -256,6 +427,8 @@ const fetchVehicleList = () => {
       type: "truck",
       loadCapacity: 10,
       status: "运行中",
+      fenceId: "1",
+      fenceName: "仓库A区域围栏",
     },
     {
       id: "2",
@@ -270,6 +443,8 @@ const fetchVehicleList = () => {
       type: "truck",
       loadCapacity: 15,
       status: "空闲",
+      fenceId: "3",
+      fenceName: "商场C区域围栏",
     },
     {
       id: "4",
@@ -284,6 +459,8 @@ const fetchVehicleList = () => {
       type: "van",
       loadCapacity: 1.5,
       status: "维修中",
+      fenceId: "1",
+      fenceName: "仓库A区域围栏",
     },
     {
       id: "6",
@@ -344,6 +521,8 @@ const showAddModal = () => {
   vehicleForm.type = "";
   vehicleForm.loadCapacity = 0;
   vehicleForm.status = "空闲";
+  vehicleForm.fenceId = "";
+  vehicleForm.fenceName = "";
   modalVisible.value = true;
 };
 
@@ -354,11 +533,63 @@ const showEditModal = (record: Vehicle) => {
   modalVisible.value = true;
 };
 
+// 地图相关
+const showMapPreview = ref(false);
+const mapCenter = ref({ lng: 116.404, lat: 39.915 });
+const mapZoom = ref(14);
+
+// 处理围栏选择变更
+const handleFenceChange = (fenceId: string) => {
+  if (fenceId) {
+    const selectedFence = fenceOptions.value.find(
+      (option) => option.value === fenceId
+    );
+    if (selectedFence) {
+      vehicleForm.fenceName = selectedFence.label;
+
+      // 查找完整围栏信息
+      const fenceDetail = mockFences.find((f) => f.id === fenceId);
+      if (fenceDetail) {
+        selectedFenceDetails.value = fenceDetail;
+        showMapPreview.value = true;
+
+        // 计算围栏中心点作为地图中心
+        if (fenceDetail.points && fenceDetail.points.length > 0) {
+          const lngSum = fenceDetail.points.reduce(
+            (sum: number, point: Point) => sum + point.lng,
+            0
+          );
+          const latSum = fenceDetail.points.reduce(
+            (sum: number, point: Point) => sum + point.lat,
+            0
+          );
+          const count = fenceDetail.points.length;
+
+          mapCenter.value = {
+            lng: lngSum / count,
+            lat: latSum / count,
+          };
+        }
+      }
+    }
+  } else {
+    vehicleForm.fenceName = "";
+    selectedFenceDetails.value = null;
+    showMapPreview.value = false;
+  }
+};
+
 // 处理弹窗确认
 const handleModalOk = () => {
   vehicleFormRef.value.validate().then(() => {
     modalLoading.value = true;
+
+    // 构建提交数据
+    const submitData = { ...vehicleForm };
+
     // TODO: 调用后端API保存数据
+    console.log("提交的车辆数据:", submitData);
+
     setTimeout(() => {
       message.success(`${modalTitle.value}成功`);
       modalVisible.value = false;

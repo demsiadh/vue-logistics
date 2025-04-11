@@ -1,1 +1,1 @@
-export const PROJECT_NAME = "领运物流";
+export const PROJECT_NAME = "vue-logistics";

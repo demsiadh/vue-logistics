@@ -50,7 +50,7 @@
         </template>
         <template v-if="column.key === 'action'">
           <a-space>
-            <a @click="showEditModal(record)">编辑</a>
+            <a @click="showViewModal(record)">查看</a>
             <a-divider type="vertical" />
             <a-switch
               :checked="record.status === 'active'"
@@ -68,9 +68,9 @@
       </template>
     </a-table>
 
-    <!-- 添加/编辑围栏弹窗 -->
+    <!-- 添加围栏弹窗 -->
     <a-modal
-      :title="modalTitle"
+      title="添加围栏"
       v-model:visible="modalVisible"
       @ok="handleModalOk"
       @cancel="handleModalCancel"
@@ -181,9 +181,9 @@
             <bm-marker
               v-for="(point, index) in polygonPoints"
               :key="index"
-              :position="point"
+              :position="{ lng: point.lng, lat: point.lat }"
               :dragging="true"
-              @dragend="(e) => handleMarkerDragend(e, index)"
+              @dragend="(e: any) => handleMarkerDragend(e, index)"
             >
               <bm-label
                 :content="String(index + 1)"
@@ -209,11 +209,140 @@
         </div>
       </div>
     </a-modal>
+
+    <!-- 围栏详情查看弹窗 -->
+    <div v-if="viewModalVisible">
+      <a-modal
+        :key="`view-modal-${viewModalKey}`"
+        title="围栏详情"
+        :visible="viewModalVisible"
+        @cancel="closeViewModal"
+        @afterClose="handleViewModalAfterClose"
+        width="900px"
+        :footer="null"
+        :destroyOnClose="true"
+        :maskClosable="false"
+        :keyboard="false"
+      >
+        <div class="modal-container">
+          <div class="map-form-container">
+            <!-- 详情部分 -->
+            <a-descriptions bordered :column="1" size="small">
+              <a-descriptions-item label="围栏名称">
+                {{ viewFenceData.name }}
+              </a-descriptions-item>
+              <a-descriptions-item label="围栏类型">
+                多边形
+              </a-descriptions-item>
+              <a-descriptions-item label="点位数量">
+                {{ viewFenceData.points?.length || 0 }}个点位
+              </a-descriptions-item>
+              <a-descriptions-item label="状态">
+                <a-tag :color="getStatusColor(viewFenceData.status)">
+                  {{ getStatusText(viewFenceData.status) }}
+                </a-tag>
+              </a-descriptions-item>
+              <a-descriptions-item label="备注">
+                {{ viewFenceData.remark || "无" }}
+              </a-descriptions-item>
+            </a-descriptions>
+
+            <a-divider orientation="left">围栏点位</a-divider>
+
+            <div
+              class="polygon-points-container"
+              v-if="viewFenceData.points && viewFenceData.points.length > 0"
+            >
+              <div
+                class="polygon-point-item"
+                v-for="(point, index) in viewFenceData.points"
+                :key="index"
+              >
+                <span class="point-index">{{ index + 1 }}</span>
+                <span class="point-coords"
+                  >{{ point.lng.toFixed(6) }}, {{ point.lat.toFixed(6) }}</span
+                >
+              </div>
+            </div>
+            <div class="point-info" v-else>
+              <a-empty
+                description="还没有添加任何点位"
+                image-style="{ height: 60px }"
+              />
+            </div>
+          </div>
+
+          <!-- 地图部分 -->
+          <div class="map-container" v-if="viewModalVisible && viewMapReady">
+            <baidu-map
+              :key="`view-map-${viewModalKey}`"
+              class="bmap"
+              :center="viewMapCenter"
+              :zoom="viewMapZoom"
+              :scroll-wheel-zoom="true"
+              @ready="onViewMapReady"
+            >
+              <!-- 地图控件 -->
+              <bm-navigation anchor="BMAP_ANCHOR_TOP_RIGHT"></bm-navigation>
+              <bm-scale anchor="BMAP_ANCHOR_BOTTOM_RIGHT"></bm-scale>
+              <bm-overview-map
+                anchor="BMAP_ANCHOR_BOTTOM_LEFT"
+                :isOpen="true"
+              ></bm-overview-map>
+
+              <!-- 多边形围栏 -->
+              <bm-polygon
+                v-if="viewFenceData.points && viewFenceData.points.length >= 3"
+                :path="viewFenceData.points"
+                stroke-color="#3388ff"
+                :stroke-opacity="0.8"
+                :stroke-weight="2"
+                fill-color="#3388ff"
+                :fill-opacity="0.3"
+              ></bm-polygon>
+
+              <!-- 点位标记 -->
+              <bm-marker
+                v-for="(point, index) in viewFenceData.points"
+                :key="index"
+                :position="{ lng: point.lng, lat: point.lat }"
+              >
+                <bm-label
+                  :content="String(index + 1)"
+                  :labelStyle="{
+                    color: 'white',
+                    backgroundColor: '#3388ff',
+                    border: '0',
+                    padding: '2px 4px',
+                    fontSize: '12px',
+                    borderRadius: '2px',
+                  }"
+                  :offset="{ width: 0, height: -25 }"
+                />
+              </bm-marker>
+            </baidu-map>
+            <div class="map-tip">
+              <a-alert type="info" show-icon>
+                <template #message>围栏详情查看，不可编辑</template>
+              </a-alert>
+            </div>
+          </div>
+        </div>
+      </a-modal>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from "vue";
+import {
+  ref,
+  reactive,
+  onMounted,
+  computed,
+  nextTick,
+  defineComponent,
+  h,
+} from "vue";
 import { message } from "ant-design-vue";
 import { PlusOutlined } from "@ant-design/icons-vue";
 import {
@@ -299,15 +428,20 @@ const fenceList = ref<Fence[]>([]);
 const mapCenter = ref({ lng: 116.404, lat: 39.915 });
 const mapZoom = ref(12);
 const BMap = ref<any>(null);
+const baiduMapInstance = ref<any>(null);
 const polygonPoints = ref<Point[]>([]);
 
 // 地图加载完成回调
 const handleMapReady = ({ BMap: bmap, map }: any) => {
   BMap.value = bmap;
+  baiduMapInstance.value = map;
 };
 
 // 地图点击事件 - 添加多边形点位
 const handleMapClick = (e: any) => {
+  // 只有在模态框打开时才添加点位
+  if (!modalVisible.value) return;
+
   const { lng, lat } = e.point;
 
   // 添加点到多边形
@@ -333,7 +467,10 @@ const updatePolygonPoint = (
 };
 
 // 处理标记拖动结束
-const handleMarkerDragend = (e: any, index: number) => {
+const handleMarkerDragend = (
+  e: { point: { lng: number; lat: number } },
+  index: number
+) => {
   updatePolygonPoint(e, index);
 };
 
@@ -350,7 +487,6 @@ const removeLastPoint = () => {
 // 弹窗相关
 const modalVisible = ref(false);
 const modalLoading = ref(false);
-const modalTitle = ref("添加围栏");
 const fenceFormRef = ref();
 const fenceForm = reactive<any>({
   id: "",
@@ -399,38 +535,134 @@ const resetSearch = () => {
 // 获取围栏列表
 const fetchFenceList = () => {
   loading.value = true;
-  // TODO: 调用后端API获取数据
+
+  // 模拟后端API调用，实现筛选功能
+  // 假数据集
+  const mockData = [
+    {
+      id: "1",
+      name: "仓库A区域围栏",
+      type: "polygon",
+      points: [
+        { lng: 116.403, lat: 39.915 },
+        { lng: 116.41, lat: 39.917 },
+        { lng: 116.415, lat: 39.91 },
+        { lng: 116.405, lat: 39.907 },
+      ],
+      status: "active",
+      remark: "仓库A区域围栏范围",
+    },
+    {
+      id: "2",
+      name: "配送网点B区域",
+      type: "polygon",
+      points: [
+        { lng: 116.433, lat: 39.935 },
+        { lng: 116.443, lat: 39.937 },
+        { lng: 116.453, lat: 39.93 },
+        { lng: 116.443, lat: 39.927 },
+        { lng: 116.433, lat: 39.932 },
+      ],
+      status: "inactive",
+      remark: "配送网点B区域围栏",
+    },
+    {
+      id: "3",
+      name: "商场C区域围栏",
+      type: "polygon",
+      points: [
+        { lng: 116.323, lat: 39.985 },
+        { lng: 116.333, lat: 39.987 },
+        { lng: 116.343, lat: 39.98 },
+        { lng: 116.333, lat: 39.977 },
+      ],
+      status: "active",
+      remark: "商场C区域电子围栏",
+    },
+    {
+      id: "4",
+      name: "学校D区域围栏",
+      type: "polygon",
+      points: [
+        { lng: 116.503, lat: 39.815 },
+        { lng: 116.513, lat: 39.817 },
+        { lng: 116.523, lat: 39.812 },
+        { lng: 116.513, lat: 39.807 },
+        { lng: 116.503, lat: 39.812 },
+      ],
+      status: "active",
+      remark: "学校D区域安全围栏",
+    },
+    {
+      id: "5",
+      name: "园区E区域围栏",
+      type: "polygon",
+      points: [
+        { lng: 116.203, lat: 39.715 },
+        { lng: 116.213, lat: 39.717 },
+        { lng: 116.223, lat: 39.71 },
+        { lng: 116.213, lat: 39.707 },
+      ],
+      status: "inactive",
+      remark: "园区E区域出入围栏",
+    },
+    {
+      id: "6",
+      name: "物流中心围栏",
+      type: "polygon",
+      points: [
+        { lng: 116.353, lat: 39.855 },
+        { lng: 116.363, lat: 39.865 },
+        { lng: 116.373, lat: 39.855 },
+        { lng: 116.363, lat: 39.845 },
+      ],
+      status: "active",
+      remark: "物流中心配送区域围栏",
+    },
+    {
+      id: "7",
+      name: "停车场围栏",
+      type: "polygon",
+      points: [
+        { lng: 116.403, lat: 39.815 },
+        { lng: 116.413, lat: 39.825 },
+        { lng: 116.423, lat: 39.815 },
+        { lng: 116.413, lat: 39.805 },
+      ],
+      status: "inactive",
+      remark: "停车场管理围栏区域",
+    },
+  ];
+
+  // 应用筛选条件
+  let filteredData = [...mockData];
+
+  // 按名称筛选
+  if (searchForm.name) {
+    filteredData = filteredData.filter((item) =>
+      item.name.toLowerCase().includes(searchForm.name.toLowerCase())
+    );
+  }
+
+  // 按状态筛选
+  if (searchForm.status) {
+    filteredData = filteredData.filter(
+      (item) => item.status === searchForm.status
+    );
+  }
+
+  // 分页处理
+  const startIndex =
+    ((pagination.current || 1) - 1) * (pagination.pageSize || 10);
+  const endIndex = startIndex + (pagination.pageSize || 10);
+  const paginatedData = filteredData.slice(startIndex, endIndex);
+
+  // 更新总条数
+  pagination.total = filteredData.length;
+
+  // 模拟后端延迟
   setTimeout(() => {
-    fenceList.value = [
-      {
-        id: "1",
-        name: "仓库A区域围栏",
-        type: "polygon",
-        points: [
-          { lng: 116.403, lat: 39.915 },
-          { lng: 116.41, lat: 39.917 },
-          { lng: 116.415, lat: 39.91 },
-          { lng: 116.405, lat: 39.907 },
-        ],
-        status: "active",
-        remark: "仓库A区域围栏范围",
-      },
-      {
-        id: "2",
-        name: "配送网点B区域",
-        type: "polygon",
-        points: [
-          { lng: 116.433, lat: 39.935 },
-          { lng: 116.443, lat: 39.937 },
-          { lng: 116.453, lat: 39.93 },
-          { lng: 116.443, lat: 39.927 },
-          { lng: 116.433, lat: 39.932 },
-        ],
-        status: "inactive",
-        remark: "配送网点B区域围栏",
-      },
-    ];
-    pagination.total = 2;
+    fenceList.value = paginatedData;
     loading.value = false;
   }, 500);
 };
@@ -444,7 +676,6 @@ const handleTableChange = (pag: any) => {
 
 // 显示添加弹窗
 const showAddModal = () => {
-  modalTitle.value = "添加围栏";
   fenceForm.id = "";
   fenceForm.name = "";
   fenceForm.type = "polygon";
@@ -457,48 +688,6 @@ const showAddModal = () => {
   // 重置地图中心到北京
   mapCenter.value = { lng: 116.404, lat: 39.915 };
   mapZoom.value = 12;
-
-  modalVisible.value = true;
-};
-
-// 显示编辑弹窗
-const showEditModal = (record: Fence) => {
-  modalTitle.value = "编辑围栏";
-
-  // 清空当前点位
-  polygonPoints.value = [];
-
-  // 深拷贝记录数据
-  const recordCopy = JSON.parse(JSON.stringify(record));
-  Object.assign(fenceForm, recordCopy);
-
-  // 加载围栏点位
-  if (record.points && record.points.length > 0) {
-    // 确保将字符串格式的经纬度转换为数字
-    polygonPoints.value = record.points.map((point) => ({
-      lng: typeof point.lng === "string" ? parseFloat(point.lng) : point.lng,
-      lat: typeof point.lat === "string" ? parseFloat(point.lat) : point.lat,
-    }));
-
-    // 计算多边形中心点作为地图中心
-    const lngSum = polygonPoints.value.reduce(
-      (sum, point) => sum + point.lng,
-      0
-    );
-    const latSum = polygonPoints.value.reduce(
-      (sum, point) => sum + point.lat,
-      0
-    );
-    const count = polygonPoints.value.length;
-
-    mapCenter.value = {
-      lng: lngSum / count,
-      lat: latSum / count,
-    };
-
-    // 根据多边形大小适当调整缩放级别
-    mapZoom.value = 14;
-  }
 
   modalVisible.value = true;
 };
@@ -526,7 +715,7 @@ const handleModalOk = () => {
     console.log("提交的围栏数据:", submitData);
 
     setTimeout(() => {
-      message.success(`${modalTitle.value}成功`);
+      message.success("添加围栏成功");
       modalVisible.value = false;
       modalLoading.value = false;
       fetchFenceList();
@@ -552,6 +741,221 @@ const handleStatusChange = (record: Fence, checked: boolean) => {
   // TODO: 调用后端API更新状态
   message.success(`围栏状态已${checked ? "启用" : "禁用"}`);
   record.status = newStatus;
+};
+
+// 定义地图组件
+const ViewMapComponent = defineComponent({
+  props: {
+    mapCenter: Object,
+    mapZoom: Number,
+    fencePoints: Array,
+  },
+  emits: ["map-ready"],
+  setup(props, { emit }) {
+    const mapInstance = ref(null);
+
+    const handleMapReady = ({ BMap, map }) => {
+      mapInstance.value = map;
+      emit("map-ready", map);
+    };
+
+    return () =>
+      h("div", { class: "map-container" }, [
+        h(
+          BaiduMap,
+          {
+            class: "bmap",
+            center: props.mapCenter,
+            zoom: props.mapZoom,
+            scrollWheelZoom: true,
+            onReady: handleMapReady,
+          },
+          [
+            h(BmNavigation, { anchor: "BMAP_ANCHOR_TOP_RIGHT" }),
+            h(BmScale, { anchor: "BMAP_ANCHOR_BOTTOM_RIGHT" }),
+            h(BmOverviewMap, {
+              anchor: "BMAP_ANCHOR_BOTTOM_LEFT",
+              isOpen: true,
+            }),
+
+            // 多边形围栏
+            props.fencePoints && props.fencePoints.length >= 3
+              ? h(BmPolygon, {
+                  path: props.fencePoints,
+                  strokeColor: "#3388ff",
+                  strokeOpacity: 0.8,
+                  strokeWeight: 2,
+                  fillColor: "#3388ff",
+                  fillOpacity: 0.3,
+                })
+              : null,
+
+            // 点位标记
+            ...(props.fencePoints || []).map((point, index) =>
+              h(
+                BmMarker,
+                {
+                  key: index,
+                  position: { lng: point.lng, lat: point.lat },
+                },
+                [
+                  h(BmLabel, {
+                    content: String(index + 1),
+                    labelStyle: {
+                      color: "white",
+                      backgroundColor: "#3388ff",
+                      border: "0",
+                      padding: "2px 4px",
+                      fontSize: "12px",
+                      borderRadius: "2px",
+                    },
+                    offset: { width: 0, height: -25 },
+                  }),
+                ]
+              )
+            ),
+          ]
+        ),
+        h("div", { class: "map-tip" }, [
+          h(
+            "a-alert",
+            {
+              type: "info",
+              showIcon: true,
+            },
+            {
+              message: () => "围栏详情查看，不可编辑",
+            }
+          ),
+        ]),
+      ]);
+  },
+});
+
+// 详情查看相关
+const viewModalVisible = ref(false);
+const viewModalKey = ref(0);
+const viewMapReady = ref(false); // 控制地图组件是否渲染
+const viewFenceData = ref<Fence>({
+  id: "",
+  name: "",
+  type: "polygon",
+  points: [],
+  status: "active",
+  remark: "",
+});
+const viewMapCenter = ref({ lng: 116.404, lat: 39.915 });
+const viewMapZoom = ref(14);
+const viewMapInstance = ref<any>(null);
+
+// 地图准备就绪回调
+const onViewMapReady = (map: any) => {
+  console.log("地图组件已准备就绪");
+  viewMapInstance.value = map;
+};
+
+// 显示详情查看弹窗
+const showViewModal = (record: Fence) => {
+  try {
+    // 重置key，强制重新渲染组件
+    viewModalKey.value++;
+    viewMapReady.value = false;
+    viewMapInstance.value = null;
+
+    // 设置数据
+    viewFenceData.value = JSON.parse(JSON.stringify(record));
+
+    // 计算围栏中心点作为地图中心
+    if (record.points && record.points.length > 0) {
+      const lngSum = record.points.reduce((sum, point) => sum + point.lng, 0);
+      const latSum = record.points.reduce((sum, point) => sum + point.lat, 0);
+      const count = record.points.length;
+
+      viewMapCenter.value = {
+        lng: lngSum / count,
+        lat: latSum / count,
+      };
+
+      // 根据多边形大小适当调整缩放级别
+      viewMapZoom.value = 14;
+    }
+
+    // 先显示模态框
+    viewModalVisible.value = true;
+
+    // 等待模态框渲染完成后再显示地图
+    nextTick(() => {
+      setTimeout(() => {
+        viewMapReady.value = true;
+      }, 300);
+    });
+  } catch (error) {
+    console.error("显示详情弹窗出错:", error);
+    message.error("显示详情失败，请重试");
+  }
+};
+
+// 关闭详情查看弹窗
+const closeViewModal = () => {
+  try {
+    console.log("关闭详情弹窗");
+
+    // 先销毁地图
+    viewMapReady.value = false;
+
+    if (viewMapInstance.value) {
+      try {
+        console.log("销毁地图实例");
+        viewMapInstance.value.destroy();
+      } catch (e) {
+        console.error("销毁地图实例失败:", e);
+      } finally {
+        viewMapInstance.value = null;
+      }
+    }
+
+    // 关闭模态框
+    viewModalVisible.value = false;
+  } catch (error) {
+    console.error("关闭详情弹窗出错:", error);
+    // 强制关闭
+    viewModalVisible.value = false;
+    viewMapInstance.value = null;
+  }
+};
+
+// 模态框完全关闭后的回调
+const handleViewModalAfterClose = () => {
+  try {
+    console.log("模态框已完全关闭");
+    viewMapReady.value = false;
+
+    // 确保地图实例被销毁
+    if (viewMapInstance.value) {
+      try {
+        viewMapInstance.value.destroy();
+      } catch (e) {
+        console.error("销毁地图实例失败:", e);
+      } finally {
+        viewMapInstance.value = null;
+      }
+    }
+
+    // 重置数据
+    viewFenceData.value = {
+      id: "",
+      name: "",
+      type: "polygon",
+      points: [],
+      status: "active",
+      remark: "",
+    };
+
+    // 增加key值，确保下次打开时重新渲染
+    viewModalKey.value++;
+  } catch (error) {
+    console.error("模态框关闭回调出错:", error);
+  }
 };
 
 // 初始化

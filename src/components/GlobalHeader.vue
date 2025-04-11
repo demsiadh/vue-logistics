@@ -40,6 +40,7 @@ import {
   OrderedListOutlined,
   CarOutlined,
   EnvironmentOutlined,
+  ShopOutlined,
 } from "@ant-design/icons-vue";
 import { MenuProps, message } from "ant-design-vue";
 import { useRouter } from "vue-router";
@@ -66,6 +67,12 @@ const items = ref<MenuProps["items"]>([
     icon: () => h(OrderedListOutlined),
     label: ROUTER_CONFIG.ORDER.NAME_CN,
     title: ROUTER_CONFIG.ORDER.NAME_CN,
+  },
+  {
+    key: ROUTER_CONFIG.OUTLET.PATH,
+    icon: () => h(ShopOutlined),
+    label: ROUTER_CONFIG.OUTLET.NAME_CN,
+    title: ROUTER_CONFIG.OUTLET.NAME_CN,
   },
   {
     key: "vehicle",

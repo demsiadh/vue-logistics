@@ -226,14 +226,12 @@ const fetchUserList = async () => {
       email: searchForm.email,
       phone: searchForm.phone,
       status: searchForm.status || USER_STATUS.ALL.VALUE,
-    };
-    const page = {
       skip: pagination.current,
       limit: pagination.pageSize,
     };
 
     // 获取用户列表
-    const res = await getUserList(params, page);
+    const res = await getUserList(params);
     if (res.data.code === 0) {
       userList.value = res.data.data.map((item, index) => ({
         ...item,

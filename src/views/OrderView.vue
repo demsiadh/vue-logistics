@@ -261,12 +261,10 @@ const fetchOrderList = async () => {
             searchForm.dateRange[1].format("YYYY-MM-DD") + " 23:59:59 UTC"
           ).toISOString()
         : new Date().toISOString(),
-    };
-    const page = {
       skip: pagination.current || 1,
       limit: pagination.pageSize || 10,
     };
-    const res = await getOrderList(params, page);
+    const res = await getOrderList(params);
     if (res.data.code === 0) {
       orderList.value = res.data.data;
     }

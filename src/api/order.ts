@@ -7,22 +7,16 @@ interface OrderListPostBody {
   status: number;
   startTime: string;
   endTime: string;
-}
-// Page 分页参数结构体
-interface Page {
   skip: number;
   limit: number;
 }
 
-export const getOrderList = (params: OrderListPostBody, page: Page) => {
+export const getOrderList = (params: OrderListPostBody) => {
   return axiosUtil.request({
     url: "/order/list",
     method: "post",
     data: {
       ...params,
-      page: {
-        ...page,
-      },
     },
     headers: {
       logistics_token: localStorage.getItem("logistics_token") || "",

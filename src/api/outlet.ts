@@ -1,18 +1,18 @@
 import axiosUtil from "@/util/request";
 import { convertToFormData } from "@/util/params";
 
-interface UserListPostBody {
+interface OutletListPostBody {
   name: string;
-  phone: string;
-  email: string;
   status: number;
+  province: string;
+  city: string;
   skip: number;
   limit: number;
 }
 
-export const getUserList = (params: UserListPostBody) => {
+export const getOutletList = (params: OutletListPostBody) => {
   return axiosUtil.request({
-    url: "/user/list",
+    url: "/outlet/list",
     method: "post",
     data: {
       ...params,
@@ -23,38 +23,22 @@ export const getUserList = (params: UserListPostBody) => {
   });
 };
 
-interface LoginUserQueryParams {
+interface UpdateOutletDTO {
+  id: string;
   name: string;
-  password: string;
+  phone: string;
+  detailAddress: string;
+  businessHours: string;
+  lng: string;
+  lat: string;
+  status: number;
+  remark: string;
 }
 
-export const loginUser = (params: LoginUserQueryParams) => {
+export const updateOutlet = (params: UpdateOutletDTO) => {
   const formData = convertToFormData(params);
   return axiosUtil.request({
-    url: "/user/login",
-    method: "post",
-    data: formData,
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
-};
-
-export const getLoginUserStatus = () => {
-  return axiosUtil.request({
-    url: "/user/loginStatus",
-    method: "get",
-    params: {},
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
-  });
-};
-
-export const updateUser = (params: UserListPostBody) => {
-  const formData = convertToFormData(params);
-  return axiosUtil.request({
-    url: "/user/update",
+    url: "/outlet/update",
     method: "put",
     data: formData,
     headers: {
@@ -64,17 +48,23 @@ export const updateUser = (params: UserListPostBody) => {
   });
 };
 
-interface AddUserDTO {
+interface CreateOutletDTO {
   name: string;
   phone: string;
-  email: string;
-  password: string;
-  rePassword: string;
+  province: string;
+  city: string;
+  detailAddress: string;
+  businessHours: string;
+  lng: string;
+  lat: string;
+  status: number;
+  remark: string;
 }
-export const createUser = (params: AddUserDTO) => {
+
+export const createOutlet = (params: CreateOutletDTO) => {
   const formData = convertToFormData(params);
   return axiosUtil.request({
-    url: "/user/create",
+    url: "/outlet/create",
     method: "post",
     data: formData,
     headers: {
@@ -86,7 +76,7 @@ export const createUser = (params: AddUserDTO) => {
 
 export const getTotalCount = () => {
   return axiosUtil.request({
-    url: "/user/total",
+    url: "/outlet/total",
     method: "get",
     params: {},
     headers: {
@@ -95,11 +85,23 @@ export const getTotalCount = () => {
   });
 };
 
-export const deleteUser = (params: { name: string }) => {
+export const deleteOutlet = (params: string) => {
   return axiosUtil.request({
-    url: "/user/delete",
+    url: "/outlet/delete",
     method: "delete",
-    params: params,
+    params: {
+      outletId: params,
+    },
+    headers: {
+      logistics_token: localStorage.getItem("logistics_token") || "",
+    },
+  });
+};
+export const getAllProvincesAndCities = () => {
+  return axiosUtil.request({
+    url: "/outlet/allProvincesAndCities",
+    method: "get",
+    params: {},
     headers: {
       logistics_token: localStorage.getItem("logistics_token") || "",
     },

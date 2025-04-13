@@ -9,11 +9,40 @@
             placeholder="请输入网点名称"
           />
         </a-form-item>
+        <a-form-item label="省份">
+          <a-select
+            v-model:value="searchForm.province"
+            placeholder="请选择省份"
+            style="width: 120px"
+            @change="handleProvinceChange"
+          >
+            <a-select-option value="">全部</a-select-option>
+            <a-select-option
+              v-for="province in provinceList"
+              :key="province"
+              :value="province"
+            >
+              {{ province }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="城市">
+          <a-select
+            v-model:value="searchForm.city"
+            placeholder="请选择城市"
+            style="width: 120px"
+          >
+            <a-select-option value="">全部</a-select-option>
+            <a-select-option v-for="city in cityList" :key="city" :value="city">
+              {{ city }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="searchForm.status" style="width: 120px">
             <a-select-option value="">全部</a-select-option>
-            <a-select-option value="active">营业中</a-select-option>
-            <a-select-option value="inactive">已关闭</a-select-option>
+            <a-select-option value="1">营业中</a-select-option>
+            <a-select-option value="2">已关闭</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item>
@@ -30,10 +59,6 @@
       <a-button type="primary" @click="showAddModal">
         <template #icon><plus-outlined /></template>
         添加网点
-      </a-button>
-      <a-button @click="showMapView" style="margin-left: 8px">
-        <template #icon><environment-outlined /></template>
-        地图查看
       </a-button>
     </div>
 
@@ -52,11 +77,11 @@
             {{ getStatusText(record.status) }}
           </a-tag>
         </template>
-        <template v-if="column.key === 'address'">
+        <template v-if="column.key === 'detailAddress'">
           <div
-            style="max-width: 250px; white-space: normal; word-break: break-all"
+            style="max-width: 200px; white-space: normal; word-break: break-all"
           >
-            {{ record.address }}
+            {{ record.detailAddress }}
           </div>
         </template>
         <template v-if="column.key === 'action'">
@@ -64,7 +89,7 @@
             <a @click="showEditModal(record)">编辑</a>
             <a-divider type="vertical" />
             <a-switch
-              :checked="record.status === 'active'"
+              :checked="record.status === 1"
               @change="(checked: boolean) => handleStatusChange(record, checked)"
             />
             <a-divider type="vertical" />
@@ -106,20 +131,71 @@
             <a-form-item label="联系电话" name="phone">
               <a-input v-model:value="outletForm.phone" />
             </a-form-item>
-            <a-form-item label="详细地址" name="address">
-              <a-textarea v-model:value="outletForm.address" :rows="2" />
+            <a-form-item label="省份" name="province">
+              <a-input
+                v-if="outletForm.id"
+                :value="outletForm.province"
+                disabled
+              />
+              <a-select
+                v-else
+                v-model:value="outletForm.province"
+                placeholder="请选择省份"
+                @change="handleProvinceSelect"
+              >
+                <a-select-option
+                  v-for="province in formProvinceList"
+                  :key="province"
+                  :value="province"
+                >
+                  {{ province }}
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item label="城市" name="city">
+              <a-input v-if="outletForm.id" :value="outletForm.city" disabled />
+              <a-select
+                v-else
+                v-model:value="outletForm.city"
+                placeholder="请选择城市"
+                @change="handleCitySelect"
+              >
+                <a-select-option
+                  v-for="city in formCityList"
+                  :key="city"
+                  :value="city"
+                >
+                  {{ city }}
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item label="详细地址" name="detailAddress">
+              <a-textarea v-model:value="outletForm.detailAddress" :rows="2" />
             </a-form-item>
             <a-form-item label="营业时间" name="businessHours">
-              <a-input
-                v-model:value="outletForm.businessHours"
-                placeholder="例如：09:00-18:00"
-              />
+              <a-space>
+                <a-time-picker
+                  v-model:value="startTime"
+                  format="HH:mm"
+                  placeholder="开始时间"
+                  style="width: 120px"
+                  @change="handleTimeChange"
+                />
+                <span>至</span>
+                <a-time-picker
+                  v-model:value="endTime"
+                  format="HH:mm"
+                  placeholder="结束时间"
+                  style="width: 120px"
+                  @change="handleTimeChange"
+                />
+              </a-space>
             </a-form-item>
             <a-form-item label="状态" name="status">
               <a-switch
                 v-model:checked="outletForm.status"
-                :checkedValue="'active'"
-                :unCheckedValue="'inactive'"
+                :checkedValue="1"
+                :unCheckedValue="2"
               />
             </a-form-item>
             <a-form-item label="备注" name="remark">
@@ -188,75 +264,17 @@
               />
             </bm-marker>
           </baidu-map>
-        </div>
-      </div>
-    </a-modal>
-
-    <!-- 地图查看弹窗 -->
-    <a-modal
-      title="网点地图查看"
-      v-model:visible="mapViewVisible"
-      @cancel="closeMapView"
-      @ok="closeMapView"
-      width="900px"
-      :footer="null"
-      :destroyOnClose="true"
-      :maskClosable="true"
-      :afterClose="handleMapModalAfterClose"
-    >
-      <div style="height: 550px; position: relative" v-if="mapViewVisible">
-        <div v-show="mapViewVisible" class="map-view-container">
-          <baidu-map
-            class="bmap-full"
-            :center="viewMapCenter"
-            :zoom="viewMapZoom"
-            :scroll-wheel-zoom="true"
-            @ready="handleViewMapReady"
-          >
-            <!-- 地图控件 -->
-            <bm-navigation anchor="BMAP_ANCHOR_TOP_RIGHT"></bm-navigation>
-            <bm-scale anchor="BMAP_ANCHOR_BOTTOM_RIGHT"></bm-scale>
-            <bm-overview-map
-              anchor="BMAP_ANCHOR_BOTTOM_LEFT"
-              :isOpen="true"
-            ></bm-overview-map>
-
-            <!-- 网点标记 -->
-            <bm-marker
-              v-for="outlet in outletList"
-              :key="outlet.id"
-              :position="{
-                lng: parseFloat(outlet.lng),
-                lat: parseFloat(outlet.lat),
-              }"
-              @click="selectOutlet(outlet.id)"
+          <!-- 定位按钮 -->
+          <div class="locate-button-container">
+            <a-button
+              type="default"
+              class="locate-button"
+              :disabled="!outletForm.lng || !outletForm.lat"
+              @click="locateToMarker"
             >
-              <bm-label
-                :content="outlet.name"
-                :labelStyle="{
-                  color: 'white',
-                  backgroundColor:
-                    outlet.status === 'active' ? '#52c41a' : '#ff4d4f',
-                  border: '0',
-                  padding: '2px 8px',
-                  fontSize: '12px',
-                  borderRadius: '2px',
-                }"
-                :offset="{ width: 0, height: -30 }"
-              />
-              <bm-info-window :show="outlet.id === selectedOutletId">
-                <div style="width: 250px">
-                  <h3>{{ outlet.name }}</h3>
-                  <p><strong>地址：</strong>{{ outlet.address }}</p>
-                  <p><strong>电话：</strong>{{ outlet.phone }}</p>
-                  <p><strong>营业时间：</strong>{{ outlet.businessHours }}</p>
-                  <p>
-                    <strong>状态：</strong>{{ getStatusText(outlet.status) }}
-                  </p>
-                </div>
-              </bm-info-window>
-            </bm-marker>
-          </baidu-map>
+              <template #icon><environment-outlined /></template>
+            </a-button>
+          </div>
         </div>
       </div>
     </a-modal>
@@ -264,23 +282,41 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick } from "vue";
+import { ref, reactive, nextTick, computed, onMounted } from "vue";
 import { message } from "ant-design-vue";
 import { PlusOutlined, EnvironmentOutlined } from "@ant-design/icons-vue";
 import {
   BaiduMap,
   BmMarker,
-  BmInfoWindow,
   BmNavigation,
   BmScale,
   BmOverviewMap,
   BmLabel,
 } from "vue-baidu-map-3x";
 import type { TablePaginationConfig } from "ant-design-vue";
+import dayjs, { Dayjs } from "dayjs";
+import {
+  getOutletList,
+  updateOutlet,
+  createOutlet,
+  deleteOutlet,
+  getTotalCount,
+  getAllProvincesAndCities,
+} from "@/api/outlet";
+import { CHINA_PROVINCES } from "@/config/constants";
+
+// 声明全局 BMap 类型
+declare global {
+  interface Window {
+    BMap: any;
+  }
+}
 
 // 搜索表单数据
 const searchForm = reactive({
   name: "",
+  province: "",
+  city: "",
   status: "",
 });
 
@@ -297,9 +333,20 @@ const columns = [
     key: "phone",
   },
   {
+    title: "省份",
+    dataIndex: "province",
+    key: "province",
+  },
+  {
+    title: "城市",
+    dataIndex: "city",
+    key: "city",
+  },
+  {
     title: "详细地址",
-    dataIndex: "address",
-    key: "address",
+    dataIndex: "detailAddress",
+    key: "detailAddress",
+    width: 200,
   },
   {
     title: "营业时间",
@@ -320,68 +367,152 @@ const columns = [
 ];
 
 // 分页配置
-const pagination = reactive<TablePaginationConfig>({
-  total: 0,
+const pagination = reactive({
   current: 1,
   pageSize: 10,
+  total: 0,
   showSizeChanger: true,
-  showQuickJumper: false,
   showTotal: (total: number) => `共 ${total} 条`,
+  onChange: (page: number, pageSize: number) => {
+    pagination.current = page;
+    pagination.pageSize = pageSize;
+    fetchOutletList();
+  },
 });
 
 // 加载状态
 const loading = ref(false);
+
+// 省份和城市数据
+const provinceList = ref<string[]>([]); // 用于搜索筛选框
+const cityList = ref<string[]>([]); // 用于搜索筛选框
+const formProvinceList = ref(CHINA_PROVINCES.map((province) => province.name)); // 用于添加/编辑表单
+const formCityList = computed(() => {
+  if (!outletForm.province) return [];
+  const province = CHINA_PROVINCES.find((p) => p.name === outletForm.province);
+  return province ? province.cities : [];
+}); // 用于添加/编辑表单
+
+// 获取省份和城市数据（仅用于搜索筛选框）
+const fetchProvincesAndCities = async () => {
+  try {
+    const res = await getAllProvincesAndCities();
+    if (res.data.code === 0) {
+      provinceList.value = res.data.data.provinces;
+      cityList.value = res.data.data.cities;
+    } else {
+      message.error("获取省份和城市数据失败");
+    }
+  } catch (error) {
+    console.error("获取省份和城市数据失败:", error);
+    message.error("获取省份和城市数据失败");
+  }
+};
+
+// 处理省份变化（搜索筛选框）
+const handleProvinceChange = async () => {
+  searchForm.city = "";
+  // 更新城市列表
+  try {
+    const res = await getAllProvincesAndCities();
+    if (res.data.code === 0) {
+      cityList.value = res.data.data.cities;
+    }
+  } catch (error) {
+    console.error("获取城市数据失败:", error);
+    message.error("获取城市数据失败");
+  }
+};
+
+// 处理表单省份变化（添加/编辑表单）
+const handleProvinceSelect = (value: string) => {
+  outletForm.city = ""; // 清空城市选择
+  if (baiduMapInstance.value && window.BMap) {
+    try {
+      // 使用 Geocoder 服务获取省份中心点
+      const geocoder = new window.BMap.Geocoder();
+      geocoder.getPoint(
+        value,
+        (point: any) => {
+          if (point) {
+            baiduMapInstance.value.centerAndZoom(point, 8);
+            mapCenter.value = { lng: point.lng, lat: point.lat };
+            mapZoom.value = 8;
+          }
+        },
+        value
+      );
+    } catch (error) {
+      console.error("地图操作失败:", error);
+      message.error("地图操作失败，请刷新页面重试");
+    }
+  }
+};
 
 // 网点数据接口
 interface Outlet {
   id: string;
   name: string;
   phone: string;
-  address: string;
+  province: string;
+  city: string;
+  detailAddress: string;
   businessHours: string;
   lng: string;
   lat: string;
-  status: string;
+  status: number;
   remark: string;
 }
 
 const outletList = ref<Outlet[]>([]);
-const selectedOutletId = ref<string>("");
 
 // 百度地图相关 - 编辑地图
 const mapCenter = ref({ lng: 116.404, lat: 39.915 });
 const mapZoom = ref(12);
 const baiduMapInstance = ref<any>(null);
 
-// 百度地图相关 - 查看地图
-const viewMapCenter = ref({ lng: 116.404, lat: 39.915 });
-const viewMapZoom = ref(11);
-const viewMapInstance = ref<any>(null);
-
-// 地图加载完成回调 - 编辑地图
+// 地图加载完成回调
 const handleMapReady = ({ BMap, map }: any) => {
   baiduMapInstance.value = map;
-};
+  window.BMap = BMap;
 
-// 地图加载完成回调 - 查看地图
-const handleViewMapReady = ({ BMap, map }: any) => {
-  viewMapInstance.value = map;
+  // 如果是编辑模式，设置地图中心点
+  if (outletForm.id && outletForm.lng && outletForm.lat) {
+    const point = new BMap.Point(
+      parseFloat(outletForm.lng),
+      parseFloat(outletForm.lat)
+    );
+    map.centerAndZoom(point, 15);
+    mapCenter.value = {
+      lng: parseFloat(outletForm.lng),
+      lat: parseFloat(outletForm.lat),
+    };
+    mapZoom.value = 15;
+  } else {
+    // 默认定位到北京
+    const point = new BMap.Point(116.404, 39.915);
+    map.centerAndZoom(point, 12);
+    mapCenter.value = { lng: 116.404, lat: 39.915 };
+    mapZoom.value = 12;
+  }
 };
 
 // 地图点击事件 - 选择网点位置
 const handleMapClick = (e: any) => {
   if (!modalVisible.value) return;
+  updateMarkerPosition(e.point);
+};
 
-  const { lng, lat } = e.point;
+// 更新标记位置
+const updateMarkerPosition = (point: any) => {
+  const { lng, lat } = point;
   outletForm.lng = lng.toFixed(6);
   outletForm.lat = lat.toFixed(6);
 };
 
 // 处理标记拖动结束
 const handleMarkerDragend = (e: any) => {
-  const { lng, lat } = e.point;
-  outletForm.lng = lng.toFixed(6);
-  outletForm.lat = lat.toFixed(6);
+  updateMarkerPosition(e.point);
 };
 
 // 弹窗相关
@@ -393,40 +524,47 @@ const outletForm = reactive<any>({
   id: "",
   name: "",
   phone: "",
-  address: "",
+  province: "",
+  city: "",
+  detailAddress: "",
   businessHours: "09:00-18:00",
   lng: "",
   lat: "",
-  status: "active",
+  status: 1,
   remark: "",
 });
-
-// 地图查看弹窗
-const mapViewVisible = ref(false);
 
 // 表单验证规则
 const formRules = {
   name: [{ required: true, message: "请输入网点名称" }],
-  phone: [{ required: true, message: "请输入联系电话" }],
-  address: [{ required: true, message: "请输入详细地址" }],
+  phone: [
+    { required: true, message: "请输入联系电话" },
+    {
+      pattern: /^0\d{2,3}-\d{7,8}$/,
+      message: "请输入正确的座机号格式（如：010-12345678）",
+    },
+  ],
+  province: [{ required: true, message: "请选择省份" }],
+  city: [{ required: true, message: "请选择城市" }],
+  detailAddress: [{ required: true, message: "请输入详细地址" }],
   lng: [{ required: true, message: "请选择或输入经度" }],
   lat: [{ required: true, message: "请选择或输入纬度" }],
 };
 
 // 获取状态颜色
-const getStatusColor = (status: string) => {
-  const colorMap: Record<string, string> = {
-    active: "green",
-    inactive: "red",
+const getStatusColor = (status: number) => {
+  const colorMap: Record<number, string> = {
+    1: "green",
+    2: "red",
   };
   return colorMap[status] || "default";
 };
 
 // 获取状态文本
-const getStatusText = (status: string) => {
-  const textMap: Record<string, string> = {
-    active: "营业中",
-    inactive: "已关闭",
+const getStatusText = (status: number) => {
+  const textMap: Record<number, string> = {
+    1: "营业中",
+    2: "已关闭",
   };
   return textMap[status] || "未知";
 };
@@ -440,127 +578,34 @@ const handleSearch = () => {
 // 重置搜索
 const resetSearch = () => {
   searchForm.name = "";
+  searchForm.province = "";
+  searchForm.city = "";
   searchForm.status = "";
   handleSearch();
 };
 
 // 获取网点列表
-const fetchOutletList = () => {
-  loading.value = true;
-
-  // 模拟后端API调用，实现筛选功能
-  // 假数据集
-  const mockData = [
-    {
-      id: "1",
-      name: "北京朝阳网点",
-      phone: "010-12345678",
-      address: "北京市朝阳区建国路88号",
-      businessHours: "09:00-18:00",
-      lng: "116.4716",
-      lat: "39.9336",
-      status: "active",
-      remark: "朝阳区主要营业网点",
-    },
-    {
-      id: "2",
-      name: "北京海淀网点",
-      phone: "010-87654321",
-      address: "北京市海淀区中关村大街1号",
-      businessHours: "08:30-18:30",
-      lng: "116.3276",
-      lat: "39.9846",
-      status: "active",
-      remark: "海淀区主要营业网点",
-    },
-    {
-      id: "3",
-      name: "上海浦东网点",
-      phone: "021-12345678",
-      address: "上海市浦东新区陆家嘴环路1000号",
-      businessHours: "09:00-18:00",
-      lng: "121.5174",
-      lat: "31.2337",
-      status: "active",
-      remark: "浦东新区主要营业网点",
-    },
-    {
-      id: "4",
-      name: "广州天河网点",
-      phone: "020-12345678",
-      address: "广州市天河区天河路385号",
-      businessHours: "09:30-18:30",
-      lng: "113.3345",
-      lat: "23.1375",
-      status: "active",
-      remark: "天河区主要营业网点",
-    },
-    {
-      id: "5",
-      name: "深圳南山网点",
-      phone: "0755-12345678",
-      address: "深圳市南山区科技园科发路8号",
-      businessHours: "09:00-19:00",
-      lng: "113.9544",
-      lat: "22.5377",
-      status: "inactive",
-      remark: "南山区主要营业网点",
-    },
-    {
-      id: "6",
-      name: "杭州西湖网点",
-      phone: "0571-12345678",
-      address: "杭州市西湖区西湖文化广场",
-      businessHours: "09:00-18:00",
-      lng: "120.1536",
-      lat: "30.2761",
-      status: "active",
-      remark: "西湖区主要营业网点",
-    },
-    {
-      id: "7",
-      name: "成都锦江网点",
-      phone: "028-12345678",
-      address: "成都市锦江区红星路三段1号",
-      businessHours: "09:30-18:30",
-      lng: "104.0879",
-      lat: "30.6598",
-      status: "inactive",
-      remark: "锦江区主要营业网点",
-    },
-  ];
-
-  // 应用筛选条件
-  let filteredData = [...mockData];
-
-  // 按名称筛选
-  if (searchForm.name) {
-    filteredData = filteredData.filter((item) =>
-      item.name.toLowerCase().includes(searchForm.name.toLowerCase())
-    );
+const fetchOutletList = async () => {
+  try {
+    const response = await getOutletList({
+      name: searchForm.name,
+      status: searchForm.status ? Number(searchForm.status) : 0,
+      province: searchForm.province,
+      city: searchForm.city,
+      skip: pagination.current - 1,
+      limit: pagination.pageSize,
+    });
+    outletList.value = response.data.data;
+    getTotalCount().then((res) => {
+      if (res.data.code === 0) {
+        pagination.total = res.data.data;
+      } else {
+        message.error("获取网点总数失败");
+      }
+    });
+  } catch (error) {
+    message.error("获取网点列表失败");
   }
-
-  // 按状态筛选
-  if (searchForm.status) {
-    filteredData = filteredData.filter(
-      (item) => item.status === searchForm.status
-    );
-  }
-
-  // 分页处理
-  const startIndex =
-    ((pagination.current || 1) - 1) * (pagination.pageSize || 10);
-  const endIndex = startIndex + (pagination.pageSize || 10);
-  const paginatedData = filteredData.slice(startIndex, endIndex);
-
-  // 更新总条数
-  pagination.total = filteredData.length;
-
-  // 模拟后端延迟
-  setTimeout(() => {
-    outletList.value = paginatedData;
-    loading.value = false;
-  }, 500);
 };
 
 // 表格变化处理
@@ -570,17 +615,37 @@ const handleTableChange = (pag: any) => {
   fetchOutletList();
 };
 
+// 时间选择器相关
+const startTime = ref<Dayjs | null>(null);
+const endTime = ref<Dayjs | null>(null);
+
+// 处理时间变化
+const handleTimeChange = () => {
+  if (startTime.value && endTime.value) {
+    const formatTime = (time: any) => {
+      return time.format("HH:mm");
+    };
+    outletForm.businessHours = `${formatTime(startTime.value)}-${formatTime(
+      endTime.value
+    )}`;
+  }
+};
+
 // 显示添加弹窗
 const showAddModal = () => {
   modalTitle.value = "添加网点";
   outletForm.id = "";
   outletForm.name = "";
   outletForm.phone = "";
-  outletForm.address = "";
-  outletForm.businessHours = "09:00-18:00";
+  outletForm.province = "";
+  outletForm.city = "";
+  outletForm.detailAddress = "";
+  outletForm.startTime = null;
+  outletForm.endTime = null;
+  outletForm.businessHours = "";
   outletForm.lng = "";
   outletForm.lat = "";
-  outletForm.status = "active";
+  outletForm.status = 1;
   outletForm.remark = "";
 
   // 重置地图中心到北京
@@ -598,6 +663,13 @@ const showEditModal = (record: Outlet) => {
   const recordCopy = JSON.parse(JSON.stringify(record));
   Object.assign(outletForm, recordCopy);
 
+  // 解析营业时间
+  if (record.businessHours) {
+    const [start, end] = record.businessHours.split("-");
+    startTime.value = dayjs(start, "HH:mm");
+    endTime.value = dayjs(end, "HH:mm");
+  }
+
   // 设置地图中心为网点位置
   mapCenter.value = {
     lng: parseFloat(record.lng),
@@ -609,23 +681,43 @@ const showEditModal = (record: Outlet) => {
 };
 
 // 处理弹窗确认
-const handleModalOk = () => {
-  outletFormRef.value.validate().then(() => {
+const handleModalOk = async () => {
+  try {
+    await outletFormRef.value.validate();
+
+    // 验证联系电话格式
+    const phoneRegex = /^0\d{2,3}-\d{7,8}$/;
+    if (!phoneRegex.test(outletForm.phone)) {
+      message.error("请输入正确的座机号格式（如：010-12345678）");
+      return;
+    }
+
     modalLoading.value = true;
 
     // 构造提交的数据
-    const submitData = { ...outletForm };
+    const submitData = {
+      ...outletForm,
+      status: outletForm.status === 1 ? 1 : 2,
+    };
 
-    // 模拟调用后端API
-    console.log("提交的网点数据:", submitData);
+    if (outletForm.id) {
+      // 更新网点
+      await updateOutlet(submitData);
+      message.success("更新网点成功");
+    } else {
+      // 创建网点
+      await createOutlet(submitData);
+      message.success("创建网点成功");
+    }
 
-    setTimeout(() => {
-      message.success(`${modalTitle.value}成功`);
-      modalVisible.value = false;
-      modalLoading.value = false;
-      fetchOutletList();
-    }, 500);
-  });
+    modalVisible.value = false;
+    fetchOutletList();
+  } catch (error) {
+    console.error("操作失败:", error);
+    message.error(outletForm.id ? "更新网点失败" : "创建网点失败");
+  } finally {
+    modalLoading.value = false;
+  }
 };
 
 // 处理弹窗取消
@@ -634,64 +726,84 @@ const handleModalCancel = () => {
 };
 
 // 处理删除
-const handleDelete = (record: Outlet) => {
-  // 模拟调用后端API删除数据
-  message.success("删除成功");
-  fetchOutletList();
+const handleDelete = async (record: Outlet) => {
+  try {
+    await deleteOutlet(record.id);
+    message.success("删除成功");
+    fetchOutletList();
+  } catch (error) {
+    message.error("删除失败");
+  }
 };
 
 // 处理状态变更
-const handleStatusChange = (record: Outlet, checked: boolean) => {
-  const newStatus = checked ? "active" : "inactive";
-  // 模拟调用后端API更新状态
-  message.success(`网点状态已${checked ? "开启" : "关闭"}`);
-  record.status = newStatus;
-};
-
-// 选择网点，显示信息窗口
-const selectOutlet = (id: string) => {
-  selectedOutletId.value = id;
-};
-
-// 显示地图查看
-const showMapView = () => {
-  // 计算地图中心点和缩放级别
-  if (outletList.value.length > 0) {
-    // 简单方法：使用第一个网点的位置作为中心
-    const firstOutlet = outletList.value[0];
-    viewMapCenter.value = {
-      lng: parseFloat(firstOutlet.lng),
-      lat: parseFloat(firstOutlet.lat),
-    };
-  }
-
-  // 重置选中的网点
-  selectedOutletId.value = "";
-
-  // 显示地图
-  mapViewVisible.value = true;
-};
-
-// 关闭地图查看
-const closeMapView = () => {
-  mapViewVisible.value = false;
-  selectedOutletId.value = "";
-};
-
-// 模态框完全关闭后的回调
-const handleMapModalAfterClose = () => {
-  // 确保完全销毁地图实例
-  if (viewMapInstance.value) {
-    viewMapInstance.value = null;
-    // 强制触发DOM更新
-    nextTick(() => {
-      console.log("Map instance destroyed");
+const handleStatusChange = async (record: Outlet, checked: boolean) => {
+  try {
+    const newStatus = checked ? 1 : 2;
+    await updateOutlet({
+      ...record,
+      status: newStatus,
     });
+    message.success(`网点状态已${checked ? "开启" : "关闭"}`);
+    record.status = newStatus;
+  } catch (error) {
+    console.error("更新状态失败:", error);
+    message.error("更新状态失败");
+  }
+};
+
+// 处理城市选择
+const handleCitySelect = (value: string) => {
+  if (baiduMapInstance.value && window.BMap) {
+    try {
+      // 使用 Geocoder 服务获取城市中心点
+      const geocoder = new window.BMap.Geocoder();
+      geocoder.getPoint(
+        value,
+        (point: any) => {
+          if (point) {
+            baiduMapInstance.value.centerAndZoom(point, 12);
+            mapCenter.value = { lng: point.lng, lat: point.lat };
+            mapZoom.value = 12;
+          }
+        },
+        outletForm.province
+      );
+    } catch (error) {
+      console.error("地图操作失败:", error);
+      message.error("地图操作失败，请刷新页面重试");
+    }
+  }
+};
+
+// 定位到标记点
+const locateToMarker = () => {
+  if (!outletForm.lng || !outletForm.lat) return;
+
+  const lng = parseFloat(outletForm.lng);
+  const lat = parseFloat(outletForm.lat);
+
+  // 更新地图中心点和缩放级别
+  mapCenter.value = { lng, lat };
+  mapZoom.value = 15;
+
+  // 如果地图实例已加载，直接调用地图方法
+  if (baiduMapInstance.value && window.BMap) {
+    try {
+      baiduMapInstance.value.setCenter(new window.BMap.Point(lng, lat));
+      baiduMapInstance.value.setZoom(15);
+    } catch (error) {
+      console.error("地图定位失败:", error);
+      message.error("地图定位失败，请刷新页面重试");
+    }
   }
 };
 
 // 初始化
-fetchOutletList();
+onMounted(() => {
+  fetchOutletList();
+  fetchProvincesAndCities();
+});
 </script>
 
 <style scoped>
@@ -746,6 +858,7 @@ fetchOutletList();
   display: flex;
   flex-direction: column;
   margin-left: 16px;
+  position: relative;
 }
 
 .bmap {
@@ -754,21 +867,35 @@ fetchOutletList();
   height: 450px;
 }
 
-.bmap-full {
-  width: 100%;
-  height: 100%;
-}
-
-:deep(.ant-form-item) {
-  margin-bottom: 16px;
-}
-
-.map-view-container {
+.locate-button-container {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 10;
+  top: 10px;
+  left: 10px;
+  z-index: 1000;
+}
+
+.locate-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: white;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.locate-button:hover {
+  color: #1890ff;
+  border-color: #1890ff;
+}
+
+.locate-button:disabled {
+  color: rgba(0, 0, 0, 0.25);
+  background-color: #f5f5f5;
+  border-color: #d9d9d9;
+  cursor: not-allowed;
 }
 </style>

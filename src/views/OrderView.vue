@@ -21,15 +21,20 @@
             style="width: 120px"
             placeholder="请选择状态"
           >
-            <a-select-option value="">全部</a-select-option>
-            <a-select-option value="pending">待处理</a-select-option>
-            <a-select-option value="processing">处理中</a-select-option>
-            <a-select-option value="completed">已完成</a-select-option>
-            <a-select-option value="cancelled">已取消</a-select-option>
+            <a-select-option :value="0">全部</a-select-option>
+            <a-select-option :value="1">待处理</a-select-option>
+            <a-select-option :value="2">处理中</a-select-option>
+            <a-select-option :value="3">已完成</a-select-option>
+            <a-select-option :value="4">已取消</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="创建时间">
-          <a-range-picker v-model:value="searchForm.dateRange" :locale="zhCN" />
+          <a-range-picker
+            v-model:value="searchForm.dateRange"
+            :locale="zhCN"
+            format="YYYY-MM-DD"
+            :placeholder="['开始日期', '结束日期']"
+          />
         </a-form-item>
         <a-form-item>
           <a-space>
@@ -106,10 +111,10 @@
         </a-form-item>
         <a-form-item label="订单状态" name="status">
           <a-select v-model:value="orderForm.status">
-            <a-select-option value="pending">待处理</a-select-option>
-            <a-select-option value="processing">处理中</a-select-option>
-            <a-select-option value="completed">已完成</a-select-option>
-            <a-select-option value="cancelled">已取消</a-select-option>
+            <a-select-option :value="1">待处理</a-select-option>
+            <a-select-option :value="2">处理中</a-select-option>
+            <a-select-option :value="3">已完成</a-select-option>
+            <a-select-option :value="4">已取消</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="备注" name="remark">
@@ -126,7 +131,19 @@ import { message } from "ant-design-vue";
 import { PlusOutlined } from "@ant-design/icons-vue";
 import type { TablePaginationConfig } from "ant-design-vue";
 import { Dayjs } from "dayjs";
+import dayjs from "dayjs";
 import zhCN from "ant-design-vue/es/date-picker/locale/zh_CN";
+import "dayjs/locale/zh-cn";
+import {
+  getOrderList,
+  getTotalCount,
+  createOrder,
+  updateOrder,
+  deleteOrder,
+} from "@/api/order";
+
+// 设置dayjs的默认语言
+dayjs.locale("zh-cn");
 
 // 定义订单接口
 interface Order {
@@ -144,16 +161,21 @@ interface Order {
 interface SearchForm {
   orderId: string;
   phone: string;
-  status: string;
+  status: number;
   dateRange: [Dayjs, Dayjs] | [];
 }
 
 const searchForm = reactive<SearchForm>({
   orderId: "",
   phone: "",
-  status: "",
+  status: 0,
   dateRange: [],
 });
+
+// 格式化日期
+const formatDate = (dateStr: string) => {
+  return dayjs(dateStr).format("YYYY-MM-DD HH:mm");
+};
 
 // 表格列定义
 const columns = [
@@ -188,6 +210,13 @@ const columns = [
     dataIndex: "createTime",
     key: "createTime",
     sorter: true,
+    customRender: ({ text }: { text: string }) => formatDate(text),
+  },
+  {
+    title: "备注",
+    dataIndex: "remark",
+    key: "remark",
+    ellipsis: true,
   },
   {
     title: "操作",
@@ -219,73 +248,35 @@ const fetchOrderList = async () => {
   try {
     // 构建查询参数
     const params = {
-      page: pagination.current || 1,
-      pageSize: pagination.pageSize || 10,
-      orderId: searchForm.orderId || undefined,
-      phone: searchForm.phone || undefined,
-      status: searchForm.status || undefined,
-      startDate: searchForm.dateRange[0]?.format("YYYY-MM-DD"),
-      endDate: searchForm.dateRange[1]?.format("YYYY-MM-DD"),
+      orderId: searchForm.orderId || "",
+      phone: searchForm.phone || "",
+      status: searchForm.status || 0,
+      startTime: searchForm.dateRange[0]
+        ? new Date(
+            searchForm.dateRange[0].format("YYYY-MM-DD") + " 00:00:00 UTC"
+          ).toISOString()
+        : new Date("2025-01-01 00:00:00 UTC").toISOString(),
+      endTime: searchForm.dateRange[1]
+        ? new Date(
+            searchForm.dateRange[1].format("YYYY-MM-DD") + " 23:59:59 UTC"
+          ).toISOString()
+        : new Date().toISOString(),
     };
-
-    // TODO: 替换为实际的API调用
-    // const response = await axios.get('/api/orders', { params });
-    // orderList.value = response.data.list;
-    // pagination.total = response.data.total;
-
-    // 模拟数据（仅用于演示）
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    const mockData: Order[] = Array.from({ length: 100 }, (_, index) => ({
-      id: index + 1,
-      orderId: `ORD${String(index + 1).padStart(6, "0")}`,
-      customerName: `客户${index + 1}`,
-      phone: `1${String(Math.floor(Math.random() * 1000000000)).padStart(
-        10,
-        "0"
-      )}`,
-      address: `北京市朝阳区某某街道第${index + 1}号`,
-      status: ["pending", "processing", "completed", "cancelled"][
-        Math.floor(Math.random() * 4)
-      ],
-      createTime: new Date(
-        Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000
-      )
-        .toISOString()
-        .split("T")[0],
-      remark: `订单备注${index + 1}`,
-    }));
-
-    // 模拟后端筛选（实际项目中应该由后端处理）
-    let filteredData = [...mockData];
-    if (params.orderId) {
-      filteredData = filteredData.filter((item) =>
-        item.orderId.includes(params.orderId!)
-      );
+    const page = {
+      skip: pagination.current || 1,
+      limit: pagination.pageSize || 10,
+    };
+    const res = await getOrderList(params, page);
+    if (res.data.code === 0) {
+      orderList.value = res.data.data;
     }
-    if (params.phone) {
-      filteredData = filteredData.filter((item) =>
-        item.phone.includes(params.phone!)
-      );
-    }
-    if (params.status) {
-      filteredData = filteredData.filter(
-        (item) => item.status === params.status
-      );
-    }
-    if (params.startDate && params.endDate) {
-      filteredData = filteredData.filter((item) => {
-        const itemDate = new Date(item.createTime);
-        const startDate = new Date(params.startDate!);
-        const endDate = new Date(params.endDate!);
-        return itemDate >= startDate && itemDate <= endDate;
-      });
-    }
-
-    // 模拟分页（实际项目中应该由后端处理）
-    const start = (params.page - 1) * params.pageSize;
-    const end = start + params.pageSize;
-    orderList.value = filteredData.slice(start, end);
-    pagination.total = filteredData.length;
+    getTotalCount().then((res) => {
+      if (res.data.code === 0) {
+        pagination.total = res.data.data;
+      } else {
+        message.error("获取订单总数失败");
+      }
+    });
   } catch (error) {
     message.error("获取订单列表失败");
   } finally {
@@ -294,29 +285,33 @@ const fetchOrderList = async () => {
 };
 
 // 获取状态颜色
-const getStatusColor = (status: string) => {
-  const colorMap: Record<string, string> = {
-    pending: "orange",
-    processing: "blue",
-    completed: "green",
-    cancelled: "red",
+const getStatusColor = (status: number) => {
+  const colorMap: Record<number, string> = {
+    1: "orange",
+    2: "blue",
+    3: "green",
+    4: "red",
   };
   return colorMap[status] || "default";
 };
 
 // 获取状态文本
-const getStatusText = (status: string) => {
-  const textMap: Record<string, string> = {
-    pending: "待处理",
-    processing: "处理中",
-    completed: "已完成",
-    cancelled: "已取消",
+const getStatusText = (status: number) => {
+  const textMap: Record<number, string> = {
+    1: "待处理",
+    2: "处理中",
+    3: "已完成",
+    4: "已取消",
   };
-  return textMap[status] || status;
+  return textMap[status] || "未知状态";
 };
 
 // 搜索处理
 const handleSearch = () => {
+  if (searchForm.phone && !/^1[3-9]\d{9}$/.test(searchForm.phone)) {
+    message.error("请输入正确的手机号码");
+    return;
+  }
   pagination.current = 1;
   fetchOrderList();
 };
@@ -326,7 +321,7 @@ const resetSearch = () => {
   Object.assign(searchForm, {
     orderId: "",
     phone: "",
-    status: "",
+    status: 0,
     dateRange: [],
   });
   pagination.current = 1;
@@ -343,7 +338,10 @@ const handleTableChange = (pag: TablePaginationConfig) => {
 // 表单校验规则
 const rules = {
   customerName: [{ required: true, message: "请输入客户名称" }],
-  phone: [{ required: true, message: "请输入联系电话" }],
+  phone: [
+    { required: true, message: "请输入联系电话" },
+    { pattern: /^1[3-9]\d{9}$/, message: "请输入正确的手机号码" },
+  ],
   address: [{ required: true, message: "请输入收货地址" }],
   status: [{ required: true, message: "请选择订单状态" }],
 };
@@ -353,11 +351,12 @@ const modalVisible = ref(false);
 const modalLoading = ref(false);
 const modalTitle = ref("新增订单");
 const orderFormRef = ref();
-const orderForm = reactive<Partial<Order>>({
+const orderForm = reactive({
+  orderId: "",
   customerName: "",
   phone: "",
   address: "",
-  status: "pending",
+  status: 1,
   remark: "",
 });
 
@@ -365,10 +364,11 @@ const orderForm = reactive<Partial<Order>>({
 const showAddModal = () => {
   modalTitle.value = "新增订单";
   Object.assign(orderForm, {
+    orderId: "",
     customerName: "",
     phone: "",
     address: "",
-    status: "pending",
+    status: 1,
     remark: "",
   });
   modalVisible.value = true;
@@ -377,7 +377,14 @@ const showAddModal = () => {
 // 显示编辑弹窗
 const showEditModal = (record: Order) => {
   modalTitle.value = "编辑订单";
-  Object.assign(orderForm, record);
+  Object.assign(orderForm, {
+    orderId: record.orderId,
+    customerName: record.customerName,
+    phone: record.phone,
+    address: record.address,
+    status: record.status,
+    remark: record.remark,
+  });
   modalVisible.value = true;
 };
 
@@ -386,13 +393,31 @@ const handleModalOk = async () => {
   try {
     await orderFormRef.value.validate();
     modalLoading.value = true;
-    // 模拟API调用
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    message.success(`${modalTitle.value}成功`);
-    modalVisible.value = false;
-    fetchOrderList();
+
+    if (modalTitle.value === "新增订单") {
+      const res = await createOrder(orderForm);
+      if (res.data.code === 0) {
+        message.success("新增订单成功");
+        modalVisible.value = false;
+        fetchOrderList();
+      } else {
+        message.error(res.data.message || "新增订单失败");
+      }
+    } else {
+      const res = await updateOrder(orderForm);
+      if (res.data.code === 0) {
+        message.success("编辑订单成功");
+        modalVisible.value = false;
+        fetchOrderList();
+      } else {
+        message.error(res.data.message || "编辑订单失败");
+      }
+    }
   } catch (error) {
     console.error("表单验证失败:", error);
+    message.error(
+      modalTitle.value === "新增订单" ? "新增订单失败" : "编辑订单失败"
+    );
   } finally {
     modalLoading.value = false;
   }
@@ -406,10 +431,13 @@ const handleModalCancel = () => {
 // 处理删除
 const handleDelete = async (record: Order) => {
   try {
-    // 模拟API调用
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    message.success("删除成功");
-    fetchOrderList();
+    const res = await deleteOrder(record.orderId);
+    if (res.data.code === 0) {
+      message.success("删除成功");
+      fetchOrderList();
+    } else {
+      message.error(res.data.message || "删除失败");
+    }
   } catch (error) {
     message.error("删除失败");
   }

@@ -1,22 +1,22 @@
 import axiosUtil from "@/util/request";
 import { convertToFormData } from "@/util/params";
 
-interface UserListPostBody {
-  name: string;
+interface OrderListPostBody {
+  orderId: string;
   phone: string;
-  email: string;
   status: number;
+  startTime: string;
+  endTime: string;
 }
-
 // Page 分页参数结构体
 interface Page {
   skip: number;
   limit: number;
 }
 
-export const getUserList = (params: UserListPostBody, page: Page) => {
+export const getOrderList = (params: OrderListPostBody, page: Page) => {
   return axiosUtil.request({
-    url: "/user/list",
+    url: "/order/list",
     method: "post",
     data: {
       ...params,
@@ -30,38 +30,19 @@ export const getUserList = (params: UserListPostBody, page: Page) => {
   });
 };
 
-interface LoginUserQueryParams {
-  name: string;
-  password: string;
+interface UpdateOrderDTO {
+  orderId: string;
+  customerName: string;
+  phone: string;
+  address: string;
+  status: number;
+  remark: string;
 }
 
-export const loginUser = (params: LoginUserQueryParams) => {
+export const updateOrder = (params: UpdateOrderDTO) => {
   const formData = convertToFormData(params);
   return axiosUtil.request({
-    url: "/user/login",
-    method: "post",
-    data: formData,
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
-  });
-};
-
-export const getLoginUserStatus = () => {
-  return axiosUtil.request({
-    url: "/user/loginStatus",
-    method: "get",
-    params: {},
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
-  });
-};
-
-export const updateUser = (params: UserListPostBody) => {
-  const formData = convertToFormData(params);
-  return axiosUtil.request({
-    url: "/user/update",
+    url: "/order/update",
     method: "put",
     data: formData,
     headers: {
@@ -71,17 +52,18 @@ export const updateUser = (params: UserListPostBody) => {
   });
 };
 
-interface AddUserDTO {
-  name: string;
+interface CreateOrderDTO {
+  customerName: string;
   phone: string;
-  email: string;
-  password: string;
-  rePassword: string;
+  address: string;
+  status: number;
+  remark: string;
 }
-export const createUser = (params: AddUserDTO) => {
+
+export const createOrder = (params: CreateOrderDTO) => {
   const formData = convertToFormData(params);
   return axiosUtil.request({
-    url: "/user/create",
+    url: "/order/create",
     method: "post",
     data: formData,
     headers: {
@@ -93,7 +75,7 @@ export const createUser = (params: AddUserDTO) => {
 
 export const getTotalCount = () => {
   return axiosUtil.request({
-    url: "/user/total",
+    url: "/order/total",
     method: "get",
     params: {},
     headers: {
@@ -102,11 +84,13 @@ export const getTotalCount = () => {
   });
 };
 
-export const deleteUser = (params: { name: string }) => {
+export const deleteOrder = (params: string) => {
   return axiosUtil.request({
-    url: "/user/delete",
+    url: "/order/delete",
     method: "delete",
-    params: params,
+    params: {
+      orderId: params,
+    },
     headers: {
       logistics_token: localStorage.getItem("logistics_token") || "",
     },

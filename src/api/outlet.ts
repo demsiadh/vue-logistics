@@ -14,9 +14,7 @@ export const getOutletList = (params: OutletListPostBody) => {
   return axiosUtil.request({
     url: "/outlet/list",
     method: "post",
-    data: {
-      ...params,
-    },
+    data: params,
     headers: {
       logistics_token: localStorage.getItem("logistics_token") || "",
     },

@@ -39,8 +39,8 @@ import {
   GithubOutlined,
   OrderedListOutlined,
   CarOutlined,
-  EnvironmentOutlined,
   ShopOutlined,
+  CiCircleOutlined,
 } from "@ant-design/icons-vue";
 import { MenuProps, message } from "ant-design-vue";
 import { useRouter } from "vue-router";
@@ -75,24 +75,16 @@ const items = ref<MenuProps["items"]>([
     title: ROUTER_CONFIG.OUTLET.NAME_CN,
   },
   {
-    key: "vehicle",
+    key: ROUTER_CONFIG.ROUTE.PATH,
+    icon: () => h(CiCircleOutlined),
+    label: ROUTER_CONFIG.ROUTE.NAME_CN,
+    title: ROUTER_CONFIG.ROUTE.NAME_CN,
+  },
+  {
+    key: ROUTER_CONFIG.VEHICLE.PATH,
     icon: () => h(CarOutlined),
-    label: "车辆管理",
-    title: "车辆管理",
-    children: [
-      {
-        key: ROUTER_CONFIG.VEHICLE.PATH,
-        icon: () => h(CarOutlined),
-        label: ROUTER_CONFIG.VEHICLE.NAME_CN,
-        title: ROUTER_CONFIG.VEHICLE.NAME_CN,
-      },
-      {
-        key: ROUTER_CONFIG.FENCE.PATH,
-        icon: () => h(EnvironmentOutlined),
-        label: ROUTER_CONFIG.FENCE.NAME_CN,
-        title: ROUTER_CONFIG.FENCE.NAME_CN,
-      },
-    ],
+    label: ROUTER_CONFIG.VEHICLE.NAME_CN,
+    title: ROUTER_CONFIG.VEHICLE.NAME_CN,
   },
   {
     key: ROUTER_CONFIG.PARENT.PATH,

@@ -3,8 +3,8 @@ import HomeView from "@/views/HomeView.vue";
 import UserView from "@/views/UserView.vue";
 import OrderView from "@/views/OrderView.vue";
 import VehicleView from "@/views/VehicleView.vue";
-import FenceView from "@/views/FenceView.vue";
 import OutletView from "@/views/OutletView.vue";
+import RouteView from "@/views/RouteView.vue";
 import { ROUTER_CONFIG } from "@/config/constants";
 import LoginLayout from "@/layouts/LoginLayout.vue";
 import BasicLayout from "@/layouts/BasicLayout.vue";
@@ -41,14 +41,14 @@ const routes: Array<RouteRecordRaw> = [
         component: VehicleView,
       },
       {
-        path: ROUTER_CONFIG.FENCE.PATH,
-        name: ROUTER_CONFIG.FENCE.NAME,
-        component: FenceView,
-      },
-      {
         path: ROUTER_CONFIG.OUTLET.PATH,
         name: ROUTER_CONFIG.OUTLET.NAME,
         component: OutletView,
+      },
+      {
+        path: ROUTER_CONFIG.ROUTE.PATH,
+        name: ROUTER_CONFIG.ROUTE.NAME,
+        component: RouteView,
       },
     ],
   },

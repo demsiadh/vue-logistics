@@ -15,9 +15,7 @@ export const getOrderList = (params: OrderListPostBody) => {
   return axiosUtil.request({
     url: "/order/list",
     method: "post",
-    data: {
-      ...params,
-    },
+    data: params,
     headers: {
       logistics_token: localStorage.getItem("logistics_token") || "",
     },

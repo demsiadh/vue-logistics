@@ -14,16 +14,13 @@ export const getUserList = (params: UserListPostBody) => {
   return axiosUtil.request({
     url: "/user/list",
     method: "post",
-    data: {
-      ...params,
-    },
+    data: params,
     headers: {
       logistics_token: localStorage.getItem("logistics_token") || "",
     },
   });
 };
 
-interface LoginUserQueryParams {
   name: string;
   password: string;
 }

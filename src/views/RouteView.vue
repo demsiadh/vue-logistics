@@ -70,17 +70,6 @@
             <a @click="showEditModal(record)">编辑</a>
             <a-divider type="vertical" />
             <a-popconfirm
-              :title="
-                record.status === 'active'
-                  ? '确定要禁用该线路吗？'
-                  : '确定要启用该线路吗？'
-              "
-              @confirm="handleToggleStatus(record)"
-            >
-              <a>{{ record.status === "active" ? "禁用" : "启用" }}</a>
-            </a-popconfirm>
-            <a-divider type="vertical" />
-            <a-popconfirm
               title="确定要删除这条线路吗？"
               @confirm="handleDelete(record)"
             >
@@ -298,7 +287,6 @@ import {
   BmScale,
   BmLabel,
 } from "vue-baidu-map-3x";
-import BMapLib from "vue-baidu-map-3x/lib/extra/BMapLib";
 import {
   getRouteList,
   createRoute,
@@ -343,26 +331,36 @@ const columns = [
     title: "线路ID",
     dataIndex: "routeId",
     key: "routeId",
+    width: 120,
+    align: "center",
   },
   {
     title: "线路名称",
     dataIndex: "name",
     key: "name",
+    width: 150,
+    ellipsis: true,
   },
   {
     title: "线路类型",
     dataIndex: "type",
     key: "type",
+    width: 120,
+    align: "center",
   },
   {
     title: "线路状态",
     dataIndex: "status",
     key: "status",
+    width: 100,
+    align: "center",
   },
   {
     title: "线路里程(km)",
     dataIndex: "distance",
     key: "distance",
+    width: 120,
+    align: "right",
     customRender: ({ record }: { record: Route }) => {
       return record.distance ? record.distance.toFixed(2) : "0.00";
     },
@@ -371,17 +369,15 @@ const columns = [
     title: "线路描述",
     dataIndex: "description",
     key: "description",
-    ellipsis: true, // 文本过长时显示省略号
+    ellipsis: true,
     width: 200,
-    customRender: ({ text }: { text: string }) => {
-      return text || "暂无描述";
-    },
   },
   {
     title: "操作",
     key: "action",
     fixed: "right",
-    width: 300,
+    width: 150,
+    align: "center",
   },
 ];
 
@@ -461,8 +457,10 @@ const formRules = {
 };
 
 // 获取状态颜色
-const getStatusColor = (status: string) => {
-  const colorMap: Record<string, string> = {
+const getStatusColor = (status: string | number) => {
+  const colorMap: Record<string | number, string> = {
+    1: "green",
+    2: "red",
     active: "green",
     inactive: "red",
   };
@@ -470,8 +468,10 @@ const getStatusColor = (status: string) => {
 };
 
 // 获取状态文本
-const getStatusText = (status: string) => {
-  const textMap: Record<string, string> = {
+const getStatusText = (status: string | number) => {
+  const textMap: Record<string | number, string> = {
+    1: "启用",
+    2: "禁用",
     active: "启用",
     inactive: "禁用",
   };
@@ -508,23 +508,23 @@ const mapStatusNumberToString = (statusNum: number): string => {
 
 // 将前端字符串状态转为API需要的数字状态
 const mapStatusStringToNumber = (statusStr: string): number => {
-  return statusStr === "active" ? 1 : 0;
+  return statusStr === "active" ? 1 : 2;
 };
 
 // 将GeoPoint数组转换为Point数组
 const geoPointsToPoints = (geoPoints: any[]): Point[] => {
-  return geoPoints.map((gp, index) => ({
-    lng: gp.Coordinates[0],
-    lat: gp.Coordinates[1],
-    id: `point-${index}`,
+  return geoPoints.map((p, index) => ({
+    id: `point-${index + 1}`,
+    lng: p.Coordinates[0],
+    lat: p.Coordinates[1],
   }));
 };
 
 // 将Point数组转换为GeoPoint数组
 const pointsToGeoPoints = (points: Point[]): string => {
   const geoPoints = points.map((p) => ({
-    type: "Point",
-    coordinates: [p.lng, p.lat],
+    Type: "Point",
+    Coordinates: [p.lng, p.lat],
   }));
   return JSON.stringify(geoPoints, null, 4);
 };
@@ -544,7 +544,7 @@ const resetSearch = () => {
   handleSearch();
 };
 
-// 获取线路列表
+// 获取线路列表数据
 const fetchRouteList = async () => {
   loading.value = true;
   try {
@@ -565,27 +565,34 @@ const fetchRouteList = async () => {
 
     if (response.data.code === 0) {
       const routes = response.data.data;
-      // 转换格式
-      routeList.value = routes.map((route: any) => ({
-        id: route.id,
-        routeId: route.routeId,
-        name: route.name,
-        type: mapTypeNumberToString(route.type),
-        status: mapStatusNumberToString(route.status),
-        description: route.description || "",
-        points: geoPointsToPoints(route.points || []),
-        distance: route.distance || 0,
-      }));
+      if (routes !== null) {
+        // 转换格式
+        routeList.value = routes.map((route: any) => ({
+          id: route.id,
+          routeId: route.routeId,
+          name: route.name,
+          type: mapTypeNumberToString(route.type),
+          status: mapStatusNumberToString(route.status),
+          description: route.description || "",
+          points: geoPointsToPoints(route.points || []),
+          distance: route.distance || 0,
+        }));
+      } else {
+        routeList.value = [];
+      }
+
       const res = await getRouteTotalCount();
       if (res.data.code === 0) {
         pagination.total = res.data.data;
       }
     } else {
       message.error("获取线路列表失败");
+      routeList.value = [];
     }
   } catch (error) {
     console.error("获取线路列表出错:", error);
     message.error("获取线路列表失败，请稍后重试");
+    routeList.value = [];
   } finally {
     loading.value = false;
   }
@@ -630,8 +637,8 @@ const showEditModal = (record: Route) => {
     id: record.id,
     routeId: record.routeId,
     name: record.name,
-    type: record.type,
-    status: record.status,
+    type: record.type.toString(), // 确保类型是字符串
+    status: record.status === "active" ? "active" : "inactive", // 保持字符串状态
     description: record.description,
     points: record.points,
     distance: record.distance,
@@ -857,47 +864,16 @@ const handleModalCancel = () => {
   modalVisible.value = false;
 };
 
-// 处理切换状态
-const handleToggleStatus = async (record: Route) => {
-  try {
-    const newStatus = record.status === "active" ? "inactive" : "active";
-    const response = await updateRoute({
-      routeId: record.routeId,
-      name: record.name,
-      type: mapTypeStringToNumber(record.type),
-      status: mapStatusStringToNumber(newStatus),
-      description: record.description,
-      points: JSON.stringify(
-        record.points.map((point) => ({
-          type: "Point",
-          coordinates: [point.lng, point.lat],
-        }))
-      ),
-      distance: record.distance,
-    });
-
-    if (response.data && response.data.code === 200) {
-      message.success(`线路${newStatus === "active" ? "启用" : "禁用"}成功`);
-      fetchRouteList();
-    } else {
-      message.error(response.data?.msg || "操作失败");
-    }
-  } catch (error) {
-    console.error("切换状态出错:", error);
-    message.error("操作失败，请稍后重试");
-  }
-};
-
 // 处理删除
 const handleDelete = async (record: Route) => {
   try {
     const response = await deleteRoute(record.routeId);
 
-    if (response.data && response.data.code === 200) {
+    if (response.data.code === 0) {
       message.success("删除成功");
       fetchRouteList();
     } else {
-      message.error(response.data?.msg || "删除失败");
+      message.error(response.data?.message || "删除失败");
     }
   } catch (error) {
     console.error("删除线路出错:", error);

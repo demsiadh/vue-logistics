@@ -18,9 +18,9 @@
         <a-form-item label="线路类型">
           <a-select v-model:value="searchForm.type" style="width: 120px">
             <a-select-option value="">全部</a-select-option>
-            <a-select-option value="regular">常规线路</a-select-option>
-            <a-select-option value="express">快速线路</a-select-option>
-            <a-select-option value="special">特殊线路</a-select-option>
+            <a-select-option value="1">常规线路</a-select-option>
+            <a-select-option value="2">快速线路</a-select-option>
+            <a-select-option value="3">特殊线路</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="线路状态">
@@ -123,9 +123,9 @@
         </a-form-item>
         <a-form-item label="线路类型" name="type">
           <a-select v-model:value="routeForm.type">
-            <a-select-option value="regular">常规线路</a-select-option>
-            <a-select-option value="express">快速线路</a-select-option>
-            <a-select-option value="special">特殊线路</a-select-option>
+            <a-select-option value="1">常规线路</a-select-option>
+            <a-select-option value="2">快速线路</a-select-option>
+            <a-select-option value="3">特殊线路</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="线路状态" name="status">
@@ -163,7 +163,6 @@
                 stroke-color="#3388ff"
                 :stroke-opacity="0.8"
                 :stroke-weight="5"
-                :enable-editing="true"
                 :editing="true"
                 @lineupdate="handleLineUpdate"
               ></bm-polyline>
@@ -299,6 +298,14 @@ import {
   BmScale,
   BmLabel,
 } from "vue-baidu-map-3x";
+import BMapLib from "vue-baidu-map-3x/lib/extra/BMapLib";
+import {
+  getRouteList,
+  createRoute,
+  updateRoute,
+  deleteRoute,
+  getRouteTotalCount,
+} from "@/api/route";
 
 interface Point {
   lng: number;
@@ -306,11 +313,16 @@ interface Point {
   id?: string;
 }
 
+interface GeoPoint {
+  type: string;
+  coordinates: number[];
+}
+
 interface Route {
   id: string;
   routeId: string;
   name: string;
-  type: string;
+  type: string | number;
   status: string;
   description: string;
   points: Point[];
@@ -321,7 +333,7 @@ interface Route {
 const searchForm = reactive({
   routeId: "",
   name: "",
-  type: "",
+  type: "" as string | number,
   status: "",
 });
 
@@ -425,7 +437,7 @@ const routeForm = reactive<Route>({
   id: "",
   routeId: "",
   name: "",
-  type: "regular",
+  type: "1",
   status: "active",
   description: "",
   points: [],
@@ -467,13 +479,54 @@ const getStatusText = (status: string) => {
 };
 
 // 获取线路类型文本
-const getRouteTypeText = (type: string) => {
-  const textMap: Record<string, string> = {
-    regular: "常规线路",
-    express: "快速线路",
-    special: "特殊线路",
+const getRouteTypeText = (type: string | number) => {
+  const textMap: Record<string | number, string> = {
+    1: "常规线路",
+    2: "快速线路",
+    3: "特殊线路",
   };
   return textMap[type] || "未知";
+};
+
+// 将API返回的数字类型转为前端数字类型(无需转换)
+const mapTypeNumberToString = (typeNum: number): string => {
+  return typeNum.toString();
+};
+
+// 将前端数字类型转为API需要的数字类型
+const mapTypeStringToNumber = (typeStr: number | string): number => {
+  if (typeof typeStr === "string" && typeStr !== "") {
+    return parseInt(typeStr, 10);
+  }
+  return typeof typeStr === "number" ? typeStr : 1;
+};
+
+// 将API返回的数字状态转为前端字符串状态
+const mapStatusNumberToString = (statusNum: number): string => {
+  return statusNum === 1 ? "active" : "inactive";
+};
+
+// 将前端字符串状态转为API需要的数字状态
+const mapStatusStringToNumber = (statusStr: string): number => {
+  return statusStr === "active" ? 1 : 0;
+};
+
+// 将GeoPoint数组转换为Point数组
+const geoPointsToPoints = (geoPoints: any[]): Point[] => {
+  return geoPoints.map((gp, index) => ({
+    lng: gp.Coordinates[0],
+    lat: gp.Coordinates[1],
+    id: `point-${index}`,
+  }));
+};
+
+// 将Point数组转换为GeoPoint数组
+const pointsToGeoPoints = (points: Point[]): string => {
+  const geoPoints = points.map((p) => ({
+    type: "Point",
+    coordinates: [p.lng, p.lat],
+  }));
+  return JSON.stringify(geoPoints, null, 4);
 };
 
 // 搜索
@@ -492,207 +545,50 @@ const resetSearch = () => {
 };
 
 // 获取线路列表
-const fetchRouteList = () => {
+const fetchRouteList = async () => {
   loading.value = true;
-  // TODO: 实际项目中应该调用后端API获取数据
+  try {
+    const typeNum = searchForm.type
+      ? mapTypeStringToNumber(searchForm.type)
+      : 0;
+    const statusNum = searchForm.status
+      ? mapStatusStringToNumber(searchForm.status)
+      : 0;
+    const response = await getRouteList({
+      routeId: searchForm.routeId || "",
+      name: searchForm.name || "",
+      type: typeNum,
+      status: statusNum,
+      skip: pagination.current || 1,
+      limit: pagination.pageSize || 10,
+    });
 
-  // 模拟数据 - 真实的路线，具有更多的点位
-  const mockData: Route[] = [
-    {
-      id: "1",
-      routeId: "RT001",
-      name: "北京-天津线路",
-      type: "regular",
-      status: "active",
-      description: "北京到天津的常规配送线路",
-      distance: 137.5, // 预计算的线路里程
-      points: [
-        { lng: 116.407526, lat: 39.90403, id: "1-1" }, // 北京站
-        { lng: 116.427659, lat: 39.90379, id: "1-2" },
-        { lng: 116.442679, lat: 39.889149, id: "1-3" },
-        { lng: 116.484693, lat: 39.872308, id: "1-4" },
-        { lng: 116.545761, lat: 39.823664, id: "1-5" },
-        { lng: 116.59314, lat: 39.798487, id: "1-6" },
-        { lng: 116.654252, lat: 39.761981, id: "1-7" },
-        { lng: 116.70824, lat: 39.698218, id: "1-8" },
-        { lng: 116.758322, lat: 39.654428, id: "1-9" },
-        { lng: 116.841149, lat: 39.590481, id: "1-10" },
-        { lng: 116.973672, lat: 39.484865, id: "1-11" },
-        { lng: 117.033467, lat: 39.378639, id: "1-12" },
-        { lng: 117.098785, lat: 39.284389, id: "1-13" },
-        { lng: 117.14685, lat: 39.208989, id: "1-14" },
-        { lng: 117.176291, lat: 39.143132, id: "1-15" },
-        { lng: 117.195559, lat: 39.094051, id: "1-16" },
-        { lng: 117.21058, lat: 39.057551, id: "1-17" },
-        { lng: 117.208047, lat: 39.028114, id: "1-18" },
-        { lng: 117.19513, lat: 39.000647, id: "1-19" },
-        { lng: 117.177235, lat: 39.980987, id: "1-20" }, // 天津站
-      ],
-    },
-    {
-      id: "2",
-      routeId: "RT002",
-      name: "北京-石家庄快速线",
-      type: "express",
-      status: "active",
-      description: "北京到石家庄的快速配送线路",
-      distance: 298.2, // 预计算的线路里程
-      points: [
-        { lng: 116.407526, lat: 39.90403, id: "2-1" }, // 北京站
-        { lng: 116.395252, lat: 39.86973, id: "2-2" },
-        { lng: 116.346844, lat: 39.827951, id: "2-3" },
-        { lng: 116.292814, lat: 39.76111, id: "2-4" },
-        { lng: 116.209602, lat: 39.683952, id: "2-5" },
-        { lng: 116.148834, lat: 39.602376, id: "2-6" },
-        { lng: 116.033777, lat: 39.524644, id: "2-7" },
-        { lng: 115.908122, lat: 39.428417, id: "2-8" },
-        { lng: 115.795939, lat: 39.248136, id: "2-9" },
-        { lng: 115.743454, lat: 39.145741, id: "2-10" },
-        { lng: 115.694189, lat: 39.029471, id: "2-11" },
-        { lng: 115.578447, lat: 38.873681, id: "2-12" },
-        { lng: 115.496563, lat: 38.755892, id: "2-13" },
-        { lng: 115.424981, lat: 38.576749, id: "2-14" },
-        { lng: 115.354543, lat: 38.498345, id: "2-15" },
-        { lng: 115.287766, lat: 38.415764, id: "2-16" },
-        { lng: 115.064563, lat: 38.268961, id: "2-17" },
-        { lng: 114.853507, lat: 38.302136, id: "2-18" },
-        { lng: 114.641021, lat: 38.299879, id: "2-19" },
-        { lng: 114.509872, lat: 38.042761, id: "2-20" }, // 石家庄站
-      ],
-    },
-    {
-      id: "3",
-      routeId: "RT003",
-      name: "北京-上海特殊线",
-      type: "special",
-      status: "inactive",
-      description: "北京到上海的特殊配送线路",
-      distance: 1318.5, // 预计算的线路里程
-      points: [
-        { lng: 116.407526, lat: 39.90403, id: "3-1" }, // 北京站
-        { lng: 116.589798, lat: 39.78644, id: "3-2" },
-        { lng: 116.832355, lat: 39.567348, id: "3-3" },
-        { lng: 117.120345, lat: 39.184556, id: "3-4" },
-        { lng: 117.354123, lat: 38.75621, id: "3-5" },
-        { lng: 117.695245, lat: 38.234156, id: "3-6" },
-        { lng: 118.045234, lat: 37.687432, id: "3-7" },
-        { lng: 118.254678, lat: 37.128764, id: "3-8" },
-        { lng: 118.534879, lat: 36.673219, id: "3-9" },
-        { lng: 118.876532, lat: 36.128765, id: "3-10" },
-        { lng: 119.123456, lat: 35.765432, id: "3-11" },
-        { lng: 119.432178, lat: 35.234567, id: "3-12" },
-        { lng: 119.765432, lat: 34.765432, id: "3-13" },
-        { lng: 120.123456, lat: 34.234567, id: "3-14" },
-        { lng: 120.432178, lat: 33.765432, id: "3-15" },
-        { lng: 120.765432, lat: 33.234567, id: "3-16" },
-        { lng: 121.032178, lat: 32.765432, id: "3-17" },
-        { lng: 121.276543, lat: 32.123456, id: "3-18" },
-        { lng: 121.432178, lat: 31.654321, id: "3-19" },
-        { lng: 121.473701, lat: 31.230416, id: "3-20" }, // 上海站
-      ],
-    },
-    {
-      id: "4",
-      routeId: "RT004",
-      name: "北京-广州线路",
-      type: "regular",
-      status: "active",
-      description: "北京到广州的常规配送线路",
-      distance: 2198.7, // 预计算的线路里程
-      points: [
-        { lng: 116.407526, lat: 39.90403, id: "4-1" }, // 北京站
-        { lng: 116.234567, lat: 39.54321, id: "4-2" },
-        { lng: 115.987654, lat: 39.123456, id: "4-3" },
-        { lng: 115.345678, lat: 38.765432, id: "4-4" },
-        { lng: 114.876543, lat: 38.123456, id: "4-5" },
-        { lng: 114.234567, lat: 37.54321, id: "4-6" },
-        { lng: 113.987654, lat: 36.876543, id: "4-7" },
-        { lng: 113.456789, lat: 36.234567, id: "4-8" },
-        { lng: 113.123456, lat: 35.765432, id: "4-9" },
-        { lng: 112.876543, lat: 35.234567, id: "4-10" },
-        { lng: 112.456789, lat: 34.654321, id: "4-11" },
-        { lng: 112.123456, lat: 33.987654, id: "4-12" },
-        { lng: 111.654321, lat: 32.876543, id: "4-13" },
-        { lng: 111.123456, lat: 31.54321, id: "4-14" },
-        { lng: 110.654321, lat: 30.234567, id: "4-15" },
-        { lng: 110.123456, lat: 28.765432, id: "4-16" },
-        { lng: 113.321928, lat: 26.654321, id: "4-17" },
-        { lng: 112.876543, lat: 24.987654, id: "4-18" },
-        { lng: 113.098765, lat: 23.54321, id: "4-19" },
-        { lng: 113.264435, lat: 23.129163, id: "4-20" }, // 广州站
-      ],
-    },
-    {
-      id: "5",
-      routeId: "RT005",
-      name: "北京-深圳快速线",
-      type: "express",
-      status: "inactive",
-      description: "北京到深圳的快速配送线路",
-      distance: 2287.3, // 预计算的线路里程
-      points: [
-        { lng: 116.407526, lat: 39.90403, id: "5-1" }, // 北京站
-        { lng: 116.123456, lat: 39.654321, id: "5-2" },
-        { lng: 115.765432, lat: 39.098765, id: "5-3" },
-        { lng: 115.345678, lat: 38.54321, id: "5-4" },
-        { lng: 114.987654, lat: 37.876543, id: "5-5" },
-        { lng: 114.456789, lat: 37.234567, id: "5-6" },
-        { lng: 113.987654, lat: 36.54321, id: "5-7" },
-        { lng: 113.456789, lat: 35.876543, id: "5-8" },
-        { lng: 112.987654, lat: 35.123456, id: "5-9" },
-        { lng: 112.456789, lat: 34.54321, id: "5-10" },
-        { lng: 111.987654, lat: 33.765432, id: "5-11" },
-        { lng: 111.345678, lat: 32.876543, id: "5-12" },
-        { lng: 110.876543, lat: 31.987654, id: "5-13" },
-        { lng: 110.234567, lat: 30.54321, id: "5-14" },
-        { lng: 110.098765, lat: 29.234567, id: "5-15" },
-        { lng: 111.345678, lat: 27.54321, id: "5-16" },
-        { lng: 112.456789, lat: 25.876543, id: "5-17" },
-        { lng: 113.234567, lat: 24.654321, id: "5-18" },
-        { lng: 113.765432, lat: 23.54321, id: "5-19" },
-        { lng: 114.085947, lat: 22.547001, id: "5-20" }, // 深圳站
-      ],
-    },
-  ];
-
-  // 根据筛选条件过滤数据
-  let filteredData = [...mockData];
-
-  // 线路ID模糊匹配
-  if (searchForm.routeId) {
-    filteredData = filteredData.filter((item) =>
-      item.routeId.toLowerCase().includes(searchForm.routeId.toLowerCase())
-    );
-  }
-
-  // 线路名称模糊匹配
-  if (searchForm.name) {
-    filteredData = filteredData.filter((item) =>
-      item.name.toLowerCase().includes(searchForm.name.toLowerCase())
-    );
-  }
-
-  // 线路类型筛选
-  if (searchForm.type) {
-    filteredData = filteredData.filter((item) => item.type === searchForm.type);
-  }
-
-  // 线路状态筛选
-  if (searchForm.status) {
-    filteredData = filteredData.filter(
-      (item) => item.status === searchForm.status
-    );
-  }
-
-  // 模拟分页（实际项目中应该由后端处理）
-  const start = ((pagination.current || 1) - 1) * (pagination.pageSize || 10);
-  const end = start + (pagination.pageSize || 10);
-  routeList.value = filteredData.slice(start, end);
-  pagination.total = filteredData.length;
-
-  setTimeout(() => {
+    if (response.data.code === 0) {
+      const routes = response.data.data;
+      // 转换格式
+      routeList.value = routes.map((route: any) => ({
+        id: route.id,
+        routeId: route.routeId,
+        name: route.name,
+        type: mapTypeNumberToString(route.type),
+        status: mapStatusNumberToString(route.status),
+        description: route.description || "",
+        points: geoPointsToPoints(route.points || []),
+        distance: route.distance || 0,
+      }));
+      const res = await getRouteTotalCount();
+      if (res.data.code === 0) {
+        pagination.total = res.data.data;
+      }
+    } else {
+      message.error("获取线路列表失败");
+    }
+  } catch (error) {
+    console.error("获取线路列表出错:", error);
+    message.error("获取线路列表失败，请稍后重试");
+  } finally {
     loading.value = false;
-  }, 500);
+  }
 };
 
 // 表格变化处理
@@ -716,7 +612,7 @@ const showAddModal = () => {
   routeForm.id = "";
   routeForm.routeId = "";
   routeForm.name = "";
-  routeForm.type = "regular";
+  routeForm.type = "1";
   routeForm.status = "active";
   routeForm.description = "";
   routeForm.points = [];
@@ -729,23 +625,31 @@ const showAddModal = () => {
 // 显示编辑弹窗
 const showEditModal = (record: Route) => {
   modalTitle.value = "编辑线路";
-  Object.assign(routeForm, record);
-  // 深拷贝线路点，避免直接修改原数据
-  routeForm.points = JSON.parse(JSON.stringify(record.points));
+  // 直接使用从列表获取的数据
+  Object.assign(routeForm, {
+    id: record.id,
+    routeId: record.routeId,
+    name: record.name,
+    type: record.type,
+    status: record.status,
+    description: record.description,
+    points: record.points,
+    distance: record.distance,
+  });
   showPointsList.value = false; // 重置列表显示状态
   modalVisible.value = true;
 
   // 计算线路中心点作为地图中心
-  if (record.points && record.points.length > 0) {
-    const lngSum = record.points.reduce(
+  if (routeForm.points && routeForm.points.length > 0) {
+    const lngSum = routeForm.points.reduce(
       (sum: number, point: Point) => sum + point.lng,
       0
     );
-    const latSum = record.points.reduce(
+    const latSum = routeForm.points.reduce(
       (sum: number, point: Point) => sum + point.lat,
       0
     );
-    const count = record.points.length;
+    const count = routeForm.points.length;
 
     mapCenter.value = {
       lng: lngSum / count,
@@ -759,48 +663,10 @@ const showPointsModal = () => {
   pointsModalVisible.value = true;
 };
 
-// 计算两点之间的距离（百度地图坐标）
-const calculateDistance = (point1: Point, point2: Point): number => {
-  const radLat1 = (point1.lat * Math.PI) / 180.0;
-  const radLat2 = (point2.lat * Math.PI) / 180.0;
-  const a = radLat1 - radLat2;
-  const b = (point1.lng * Math.PI) / 180.0 - (point2.lng * Math.PI) / 180.0;
-  let s =
-    2 *
-    Math.asin(
-      Math.sqrt(
-        Math.pow(Math.sin(a / 2), 2) +
-          Math.cos(radLat1) * Math.cos(radLat2) * Math.pow(Math.sin(b / 2), 2)
-      )
-    );
-  s = s * 6378.137; // 地球半径
-  s = Math.round(s * 10000) / 10000; // 四舍五入，保留4位小数
-  return s;
-};
-
-// 计算线路总里程
-const calculateTotalDistance = (points: Point[]): number => {
-  let totalDistance = 0;
-  if (points.length < 2) return totalDistance;
-
-  for (let i = 0; i < points.length - 1; i++) {
-    totalDistance += calculateDistance(points[i], points[i + 1]);
-  }
-  return totalDistance;
-};
-
-// 更新线路表单里程
-const updateRouteDistance = () => {
-  // 距离不再由前端计算，后端会处理
-  // routeForm.distance = calculateTotalDistance(routeForm.points);
-  console.log("线路点已更新，距离将由后端计算");
-};
-
-// 处理地图点击事件
+// 修改处理地图点击事件
 const handleMapClick = (e: any) => {
   console.log("地图点击事件:", e);
   if (isAddingPoint.value) {
-    // 百度地图事件处理，获取点击位置的坐标
     const lng = e.point ? e.point.lng : e.latlng ? e.latlng.lng : null;
     const lat = e.point ? e.point.lat : e.latlng ? e.latlng.lat : null;
 
@@ -811,18 +677,118 @@ const handleMapClick = (e: any) => {
         id: `point-${Date.now()}`,
       };
       routeForm.points.push(point);
-
-      // 不退出添加状态，允许连续添加点
       message.success(
         `已添加第 ${routeForm.points.length} 个点，点击地图继续添加点`
       );
-
-      // 更新线路里程
-      updateRouteDistance();
+      // 添加点后计算距离
+      calculateDistance();
     } else {
       message.error("获取坐标失败，请重试");
     }
   }
+};
+
+// 修改清空线路点
+const clearPoints = () => {
+  routeForm.points = [];
+  routeForm.distance = 0; // 清空距离
+};
+
+// 修改移除线路点
+const removePoint = (index: number) => {
+  routeForm.points.splice(index, 1);
+  // 移除点后计算距离
+  calculateDistance();
+};
+
+// 修改移动线路点
+const movePoint = (index: number, direction: "up" | "down") => {
+  if (direction === "up" && index > 0) {
+    const temp = routeForm.points[index];
+    routeForm.points[index] = routeForm.points[index - 1];
+    routeForm.points[index - 1] = temp;
+    // 移动点后计算距离
+    calculateDistance();
+  } else if (direction === "down" && index < routeForm.points.length - 1) {
+    const temp = routeForm.points[index];
+    routeForm.points[index] = routeForm.points[index + 1];
+    routeForm.points[index + 1] = temp;
+    // 移动点后计算距离
+    calculateDistance();
+  }
+};
+
+// 修改处理标记拖拽结束
+const handleMarkerDragend = (e: any, index: number) => {
+  const newPoint = {
+    lng: e.point.lng,
+    lat: e.point.lat,
+    id: routeForm.points[index].id,
+  };
+  routeForm.points.splice(index, 1, newPoint);
+  // 拖拽结束后计算距离
+  calculateDistance();
+};
+
+// 修改处理线路更新
+const handleLineUpdate = (e: any) => {
+  if (e.target && e.target.getPath) {
+    const path = e.target.getPath();
+    routeForm.points = path.map((point: any, index: number) => ({
+      lng: point.lng,
+      lat: point.lat,
+      id: routeForm.points[index]?.id || `point-${Date.now()}-${index}`,
+    }));
+    // 线路更新后计算距离
+    calculateDistance();
+  }
+};
+
+// 添加计算距离的通用方法
+const calculateDistance = () => {
+  if (routeForm.points.length < 2) {
+    routeForm.distance = 0;
+    return;
+  }
+
+  // 计算线路总距离（使用简单的球面距离公式）
+  let totalDistance = 0;
+  for (let i = 0; i < routeForm.points.length - 1; i++) {
+    const point1 = routeForm.points[i];
+    const point2 = routeForm.points[i + 1];
+
+    // 将经纬度转换为弧度
+    const rad = (d: number) => (d * Math.PI) / 180;
+    const lat1 = rad(point1.lat);
+    const lat2 = rad(point2.lat);
+    const deltaLat = rad(point2.lat - point1.lat);
+    const deltaLng = rad(point2.lng - point1.lng);
+
+    // 使用Haversine公式计算距离
+    const a =
+      Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+      Math.cos(lat1) *
+        Math.cos(lat2) *
+        Math.sin(deltaLng / 2) *
+        Math.sin(deltaLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = 6371 * c; // 地球半径6371km
+
+    totalDistance += distance;
+  }
+
+  routeForm.distance = totalDistance;
+};
+
+// 修改确认线路方法
+const sortRoutePoints = () => {
+  if (routeForm.points.length < 2) {
+    message.warning("至少需要两个点才能形成线路");
+    return;
+  }
+
+  calculateDistance();
+  message.success(`线路已确认，总里程：${routeForm.distance.toFixed(2)}公里`);
 };
 
 // 添加线路点
@@ -839,72 +805,51 @@ const exitAddingMode = () => {
   }
 };
 
-// 清空线路点
-const clearPoints = () => {
-  routeForm.points = [];
-};
-
-// 移除线路点
-const removePoint = (index: number) => {
-  routeForm.points.splice(index, 1);
-};
-
-// 移动线路点
-const movePoint = (index: number, direction: "up" | "down") => {
-  if (direction === "up" && index > 0) {
-    const temp = routeForm.points[index];
-    routeForm.points[index] = routeForm.points[index - 1];
-    routeForm.points[index - 1] = temp;
-  } else if (direction === "down" && index < routeForm.points.length - 1) {
-    const temp = routeForm.points[index];
-    routeForm.points[index] = routeForm.points[index + 1];
-    routeForm.points[index + 1] = temp;
-  }
-  // 重新计算线路里程
-  updateRouteDistance();
-};
-
-// 处理标记拖拽结束
-const handleMarkerDragend = (e: any, index: number) => {
-  routeForm.points[index].lng = e.latlng.lng;
-  routeForm.points[index].lat = e.latlng.lat;
-  // 更新线路里程
-  updateRouteDistance();
-};
-
-// 处理线路更新
-const handleLineUpdate = (e: any) => {
-  // 当用户在地图上直接编辑线路时，更新线路点
-  if (e.target && e.target.getPath) {
-    const path = e.target.getPath();
-    routeForm.points = path.map((point: any, index: number) => ({
-      lng: point.lng,
-      lat: point.lat,
-      id: routeForm.points[index]?.id || `point-${Date.now()}-${index}`,
-    }));
-    // 更新线路里程
-    updateRouteDistance();
-  }
-};
-
 // 处理弹窗确认
-const handleModalOk = () => {
-  routeFormRef.value.validate().then(() => {
+const handleModalOk = async () => {
+  try {
+    await routeFormRef.value.validate();
     modalLoading.value = true;
 
-    // 构建提交数据，移除distance字段，由后端计算
-    const { distance, ...submitData } = { ...routeForm };
+    // 构建提交数据
+    const submitData = {
+      name: routeForm.name,
+      type: mapTypeStringToNumber(routeForm.type),
+      status: mapStatusStringToNumber(routeForm.status),
+      description: routeForm.description,
+      points: JSON.stringify(
+        routeForm.points.map((point) => ({
+          type: "Point",
+          coordinates: [point.lng, point.lat],
+        }))
+      ),
+      distance: routeForm.distance,
+    };
+    let response;
+    if (modalTitle.value === "添加线路") {
+      // 创建新线路
+      response = await createRoute(submitData);
+    } else {
+      // 更新现有线路
+      response = await updateRoute({
+        ...submitData,
+        routeId: routeForm.routeId,
+      });
+    }
 
-    // TODO: 调用后端API保存数据
-    console.log("提交的线路数据:", submitData);
-
-    setTimeout(() => {
+    if (response.data.code === 0) {
       message.success(`${modalTitle.value}成功`);
       modalVisible.value = false;
-      modalLoading.value = false;
       fetchRouteList();
-    }, 500);
-  });
+    } else {
+      message.error(response.data?.msg || `${modalTitle.value}失败`);
+    }
+  } catch (error) {
+    console.error(`${modalTitle.value}出错:`, error);
+    message.error(`${modalTitle.value}失败，请稍后重试`);
+  } finally {
+    modalLoading.value = false;
+  }
 };
 
 // 处理弹窗取消
@@ -913,26 +858,51 @@ const handleModalCancel = () => {
 };
 
 // 处理切换状态
-const handleToggleStatus = (record: Route) => {
-  // TODO: 调用后端API更新状态
-  const newStatus = record.status === "active" ? "inactive" : "active";
-  message.success(`线路${newStatus === "active" ? "启用" : "禁用"}成功`);
-  fetchRouteList();
+const handleToggleStatus = async (record: Route) => {
+  try {
+    const newStatus = record.status === "active" ? "inactive" : "active";
+    const response = await updateRoute({
+      routeId: record.routeId,
+      name: record.name,
+      type: mapTypeStringToNumber(record.type),
+      status: mapStatusStringToNumber(newStatus),
+      description: record.description,
+      points: JSON.stringify(
+        record.points.map((point) => ({
+          type: "Point",
+          coordinates: [point.lng, point.lat],
+        }))
+      ),
+      distance: record.distance,
+    });
+
+    if (response.data && response.data.code === 200) {
+      message.success(`线路${newStatus === "active" ? "启用" : "禁用"}成功`);
+      fetchRouteList();
+    } else {
+      message.error(response.data?.msg || "操作失败");
+    }
+  } catch (error) {
+    console.error("切换状态出错:", error);
+    message.error("操作失败，请稍后重试");
+  }
 };
 
 // 处理删除
-const handleDelete = (record: Route) => {
-  // TODO: 调用后端API删除数据
-  message.success("删除成功");
-  fetchRouteList();
-};
+const handleDelete = async (record: Route) => {
+  try {
+    const response = await deleteRoute(record.routeId);
 
-// 添加方法：确保线路点按顺序排列
-const sortRoutePoints = () => {
-  // 这里我们不实际排序，因为线路点的顺序本身就定义了路径
-  // 但是可以在这里添加逻辑来确保线路是连续的
-  message.success("线路点已按顺序连接形成折线");
-  updateRouteDistance();
+    if (response.data && response.data.code === 200) {
+      message.success("删除成功");
+      fetchRouteList();
+    } else {
+      message.error(response.data?.msg || "删除失败");
+    }
+  } catch (error) {
+    console.error("删除线路出错:", error);
+    message.error("删除失败，请稍后重试");
+  }
 };
 
 // 初始化

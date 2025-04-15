@@ -21,18 +21,14 @@ export const getRouteList = (params: RouteListPostBody) => {
   });
 };
 
-interface GeoPoint {
-  type: string; // 类型，固定为 "Point"
-  coordinates: number[]; // 坐标，包含经度和纬度
-}
-
 interface UpdateRouteDTO {
   routeId: string; // 路线编号
   name: string; // 路线名称
   type: number; // 路线类型
   status: number; // 路线状态
   description: string; // 路线描述
-  points: GeoPoint[]; // 线路点位，采用GeoJSON格式
+  points: string; // 线路点位，采用GeoJSON格式
+  distance: number; // 线路距离
 }
 
 export const updateRoute = (params: UpdateRouteDTO) => {
@@ -53,7 +49,8 @@ interface CreateRouteDTO {
   type: number; // 路线类型
   status: number; // 路线状态
   description: string; // 路线描述
-  points: GeoPoint[]; // 线路点位，采用GeoJSON格式
+  points: string; // 线路点位，采用GeoJSON格式
+  distance: number; // 线路距离
 }
 
 export const createRoute = (params: CreateRouteDTO) => {
@@ -84,19 +81,6 @@ export const deleteRoute = (routeId: string) => {
   return axiosUtil.request({
     url: "/route/delete",
     method: "delete",
-    params: {
-      routeId: routeId,
-    },
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
-  });
-};
-
-export const getRouteDetail = (routeId: string) => {
-  return axiosUtil.request({
-    url: "/route/detail",
-    method: "get",
     params: {
       routeId: routeId,
     },

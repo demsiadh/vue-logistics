@@ -15,7 +15,8 @@ export function convertToFormData<T extends Record<string, any>>(
     } else if (typeof value === "object" && !(value instanceof File)) {
       formData.append(key, JSON.stringify(value));
     } else {
-      formData.append(key, value);
+      // 确保数字类型被转换为字符串
+      formData.append(key, String(value));
     }
   });
 

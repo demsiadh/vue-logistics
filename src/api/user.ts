@@ -21,6 +21,7 @@ export const getUserList = (params: UserListPostBody) => {
   });
 };
 
+interface LoginUserQueryParams {
   name: string;
   password: string;
 }

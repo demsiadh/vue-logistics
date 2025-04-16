@@ -159,7 +159,7 @@ import { PlusOutlined } from "@ant-design/icons-vue";
 import type { TablePaginationConfig } from "ant-design-vue";
 import {
   getTotalCount,
-  getvehicleList,
+  getVehicleList,
   updatevehicle,
   deletevehicle,
   createvehicle,
@@ -362,7 +362,7 @@ const fetchVehicleList = () => {
   };
 
   // 使用 Promise.all 等待所有请求完成
-  Promise.all([getvehicleList(params), getTotalCount()])
+  Promise.all([getVehicleList(params), getTotalCount()])
     .then(([vehicleRes, totalRes]) => {
       if (vehicleRes.data.code === 0) {
         // 处理返回的数据，确保处理 null 或不存在的情况

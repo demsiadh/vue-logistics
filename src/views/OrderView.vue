@@ -306,10 +306,6 @@ const getStatusText = (status: number) => {
 
 // 搜索处理
 const handleSearch = () => {
-  if (searchForm.phone && !/^1[3-9]\d{9}$/.test(searchForm.phone)) {
-    message.error("请输入正确的手机号码");
-    return;
-  }
   pagination.current = 1;
   fetchOrderList();
 };
@@ -336,10 +332,7 @@ const handleTableChange = (pag: TablePaginationConfig) => {
 // 表单校验规则
 const rules = {
   customerName: [{ required: true, message: "请输入客户名称" }],
-  phone: [
-    { required: true, message: "请输入联系电话" },
-    { pattern: /^1[3-9]\d{9}$/, message: "请输入正确的手机号码" },
-  ],
+  phone: [{ required: true, message: "请输入联系电话" }],
   address: [{ required: true, message: "请输入收货地址" }],
   status: [{ required: true, message: "请选择订单状态" }],
 };

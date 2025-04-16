@@ -501,6 +501,30 @@ const handleMapReady = ({ BMap, map }: any) => {
 const handleMapClick = (e: any) => {
   if (!modalVisible.value) return;
   updateMarkerPosition(e.point);
+
+  // 使用逆地理编码服务获取地址信息
+  if (window.BMap) {
+    const geocoder = new window.BMap.Geocoder();
+    geocoder.getLocation(e.point, (result: any) => {
+      if (result) {
+        const address = result.address;
+        const addressComponents = result.addressComponents;
+
+        // 更新省份和城市
+        if (addressComponents.province) {
+          outletForm.province = addressComponents.province;
+        }
+        if (addressComponents.city) {
+          outletForm.city = addressComponents.city;
+        }
+
+        // 更新详细地址
+        if (address) {
+          outletForm.detailAddress = address;
+        }
+      }
+    });
+  }
 };
 
 // 更新标记位置

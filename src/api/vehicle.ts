@@ -11,7 +11,7 @@ interface vehicleListPostBody {
   limit: number;
 }
 
-export const getvehicleList = (params: vehicleListPostBody) => {
+export const getVehicleList = (params: vehicleListPostBody) => {
   return axiosUtil.request({
     url: "/vehicle/list",
     method: "post",

@@ -678,7 +678,7 @@ const showAddModal = () => {
   outletForm.detailAddress = "";
   outletForm.startTime = null;
   outletForm.endTime = null;
-  outletForm.businessHours = "";
+  outletForm.businessHours = "10:00-18:00";
   outletForm.lng = "";
   outletForm.lat = "";
   outletForm.status = 1;
@@ -687,6 +687,10 @@ const showAddModal = () => {
   // 重置地图中心到北京
   mapCenter.value = { lng: 116.404, lat: 39.915 };
   mapZoom.value = 12;
+
+  // 设置默认的时间选择器值
+  startTime.value = dayjs("10:00", "HH:mm");
+  endTime.value = dayjs("18:00", "HH:mm");
 
   modalVisible.value = true;
 };
@@ -729,6 +733,11 @@ const handleModalOk = async () => {
     }
 
     modalLoading.value = true;
+
+    // 如果营业时间为空，设置默认值
+    if (!outletForm.businessHours) {
+      outletForm.businessHours = "10:00-18:00";
+    }
 
     // 构造提交的数据
     const submitData = {

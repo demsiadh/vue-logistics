@@ -237,17 +237,18 @@ const fetchUserList = async () => {
         ...item,
         id: (pagination.current - 1) * pagination.pageSize + index + 1,
       }));
-    }
 
-    // 获取总数
-    const countRes = await getTotalCount();
-    if (countRes.data.code === 0) {
-      pagination.total = countRes.data.data;
+      // 直接使用数据长度作为总数
+      pagination.total = res.data.data.length;
     } else {
-      message.error("获取用户总数失败");
+      userList.value = [];
+      pagination.total = 0;
+      message.error(res.data.message || "获取用户列表失败");
     }
   } catch (error) {
     message.error("获取用户列表失败");
+    userList.value = [];
+    pagination.total = 0;
   } finally {
     loading.value = false;
   }

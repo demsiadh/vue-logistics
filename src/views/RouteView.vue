@@ -565,7 +565,7 @@ const fetchRouteList = async () => {
 
     if (response.data.code === 0) {
       const routes = response.data.data;
-      if (routes !== null) {
+      if (routes !== null && Array.isArray(routes)) {
         // 转换格式
         routeList.value = routes.map((route: any) => ({
           id: route.id,
@@ -577,22 +577,23 @@ const fetchRouteList = async () => {
           points: geoPointsToPoints(route.points || []),
           distance: route.distance || 0,
         }));
+
+        // 使用数据长度作为总数
+        pagination.total = routes.length;
       } else {
         routeList.value = [];
-      }
-
-      const res = await getRouteTotalCount();
-      if (res.data.code === 0) {
-        pagination.total = res.data.data;
+        pagination.total = 0;
       }
     } else {
       message.error("获取线路列表失败");
       routeList.value = [];
+      pagination.total = 0;
     }
   } catch (error) {
     console.error("获取线路列表出错:", error);
     message.error("获取线路列表失败，请稍后重试");
     routeList.value = [];
+    pagination.total = 0;
   } finally {
     loading.value = false;
   }

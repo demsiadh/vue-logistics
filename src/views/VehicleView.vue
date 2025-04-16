@@ -361,9 +361,9 @@ const fetchVehicleList = () => {
     skip: pagination.current || 1,
   };
 
-  // 使用 Promise.all 等待所有请求完成
-  Promise.all([getVehicleList(params), getTotalCount()])
-    .then(([vehicleRes, totalRes]) => {
+  // 直接调用获取车辆列表接口
+  getVehicleList(params)
+    .then((vehicleRes) => {
       if (vehicleRes.data.code === 0) {
         // 处理返回的数据，确保处理 null 或不存在的情况
         if (
@@ -381,21 +381,19 @@ const fetchVehicleList = () => {
             statusText: getVehicleStatusText(vehicle.status),
             typeText: getVehicleTypeText(vehicle.type),
           }));
+
+          // 使用获取到的数据长度作为总数
+          pagination.total = vehicleRes.data.data.length;
         } else {
           // 如果后端返回 null 或空数组，则将列表设为空数组
           vehicleList.value = [];
+          pagination.total = 0;
           message.info("没有查询到符合条件的车辆信息");
         }
       } else {
         // 处理业务错误码
         message.error(vehicleRes.data.message || "获取车辆列表失败");
         vehicleList.value = [];
-      }
-
-      if (totalRes.data.code === 0) {
-        // 更新总数，确保处理 null 的情况
-        pagination.total = totalRes.data.data || 0;
-      } else {
         pagination.total = 0;
       }
     })

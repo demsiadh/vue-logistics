@@ -266,17 +266,23 @@ const fetchOrderList = async () => {
     };
     const res = await getOrderList(params);
     if (res.data.code === 0) {
-      orderList.value = res.data.data;
-    }
-    getTotalCount().then((res) => {
-      if (res.data.code === 0) {
-        pagination.total = res.data.data;
+      if (res.data.data && Array.isArray(res.data.data)) {
+        orderList.value = res.data.data;
+        // 使用获取到的数据长度作为总数
+        pagination.total = res.data.data.length;
       } else {
-        message.error("获取订单总数失败");
+        orderList.value = [];
+        pagination.total = 0;
       }
-    });
+    } else {
+      message.error("获取订单列表失败");
+      orderList.value = [];
+      pagination.total = 0;
+    }
   } catch (error) {
     message.error("获取订单列表失败");
+    orderList.value = [];
+    pagination.total = 0;
   } finally {
     loading.value = false;
   }

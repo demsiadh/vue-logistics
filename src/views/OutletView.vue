@@ -610,6 +610,7 @@ const resetSearch = () => {
 
 // 获取网点列表
 const fetchOutletList = async () => {
+  loading.value = true;
   try {
     const response = await getOutletList({
       name: searchForm.name,
@@ -619,16 +620,27 @@ const fetchOutletList = async () => {
       skip: pagination.current - 1,
       limit: pagination.pageSize,
     });
-    outletList.value = response.data.data;
-    getTotalCount().then((res) => {
-      if (res.data.code === 0) {
-        pagination.total = res.data.data;
+
+    if (response.data.code === 0) {
+      if (response.data.data && Array.isArray(response.data.data)) {
+        outletList.value = response.data.data;
+        // 使用获取到的数据长度作为总数
+        pagination.total = response.data.data.length;
       } else {
-        message.error("获取网点总数失败");
+        outletList.value = [];
+        pagination.total = 0;
       }
-    });
+    } else {
+      message.error("获取网点列表失败");
+      outletList.value = [];
+      pagination.total = 0;
+    }
   } catch (error) {
     message.error("获取网点列表失败");
+    outletList.value = [];
+    pagination.total = 0;
+  } finally {
+    loading.value = false;
   }
 };
 

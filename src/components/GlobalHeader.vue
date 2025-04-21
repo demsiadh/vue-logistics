@@ -41,6 +41,7 @@ import {
   CarOutlined,
   ShopOutlined,
   CiCircleOutlined,
+  MessageOutlined,
 } from "@ant-design/icons-vue";
 import { MenuProps, message } from "ant-design-vue";
 import { useRouter } from "vue-router";
@@ -85,6 +86,12 @@ const items = ref<MenuProps["items"]>([
     icon: () => h(CarOutlined),
     label: ROUTER_CONFIG.VEHICLE.NAME_CN,
     title: ROUTER_CONFIG.VEHICLE.NAME_CN,
+  },
+  {
+    key: ROUTER_CONFIG.CHAT.PATH,
+    icon: () => h(MessageOutlined),
+    label: ROUTER_CONFIG.CHAT.NAME_CN,
+    title: ROUTER_CONFIG.CHAT.NAME_CN,
   },
   {
     key: ROUTER_CONFIG.PARENT.PATH,

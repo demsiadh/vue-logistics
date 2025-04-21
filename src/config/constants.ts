@@ -45,6 +45,11 @@ export const ROUTER_CONFIG: Record<string, RouterConfig> = {
     NAME: "route",
     NAME_CN: "线路管理",
   },
+  CHAT: {
+    PATH: "/chat",
+    NAME: "chat",
+    NAME_CN: "智能客服",
+  },
 };
 
 interface UserStatus {

@@ -5,6 +5,7 @@ import OrderView from "@/views/OrderView.vue";
 import VehicleView from "@/views/VehicleView.vue";
 import OutletView from "@/views/OutletView.vue";
 import RouteView from "@/views/RouteView.vue";
+import ChatView from "@/views/ChatView.vue";
 import { ROUTER_CONFIG } from "@/config/constants";
 import LoginLayout from "@/layouts/LoginLayout.vue";
 import BasicLayout from "@/layouts/BasicLayout.vue";
@@ -49,6 +50,11 @@ const routes: Array<RouteRecordRaw> = [
         path: ROUTER_CONFIG.ROUTE.PATH,
         name: ROUTER_CONFIG.ROUTE.NAME,
         component: RouteView,
+      },
+      {
+        path: ROUTER_CONFIG.CHAT.PATH,
+        name: ROUTER_CONFIG.CHAT.NAME,
+        component: ChatView,
       },
     ],
   },

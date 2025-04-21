@@ -106,16 +106,7 @@
           <a-input v-model:value="editForm.email" />
         </a-form-item>
         <a-form-item label="状态" name="status">
-          <a-select v-model:value="editForm.status">
-            <a-select-option :value="USER_STATUS.ACTIVE.VALUE">{{
-              USER_STATUS.ACTIVE.NAME
-            }}</a-select-option>
-            <a-select-option :value="USER_STATUS.BANNED.VALUE">{{
-              USER_STATUS.BANNED.NAME
-            }}</a-select-option>
-            <a-select-option :value="USER_STATUS.DELETED.VALUE">{{
-              USER_STATUS.DELETED.NAME
-            }}</a-select-option>
+          <a-select v-model:value="editForm.status" :options="statusOptions">
           </a-select>
         </a-form-item>
       </a-form>
@@ -156,7 +147,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, onMounted, computed } from "vue";
 import { message } from "ant-design-vue";
 import { PlusOutlined } from "@ant-design/icons-vue";
 import { USER_STATUS } from "@/config/constants";
@@ -330,10 +321,30 @@ const rules = {
   ],
 };
 
+// 状态选项列表
+const statusOptions = computed(() => [
+  {
+    value: USER_STATUS.ACTIVE.VALUE,
+    label: USER_STATUS.ACTIVE.NAME,
+  },
+  {
+    value: USER_STATUS.BANNED.VALUE,
+    label: USER_STATUS.BANNED.NAME,
+  },
+  {
+    value: USER_STATUS.DELETED.VALUE,
+    label: USER_STATUS.DELETED.NAME,
+  },
+]);
+
 // 显示编辑模态框
 const showEditModal = (record) => {
   editModalVisible.value = true;
-  Object.assign(editForm, record);
+  // 深拷贝记录对象，避免直接修改原始数据
+  const recordCopy = JSON.parse(JSON.stringify(record));
+  // 确保状态是数字类型
+  recordCopy.status = parseInt(recordCopy.status, 10);
+  Object.assign(editForm, recordCopy);
 };
 
 // 更新用户信息
@@ -341,7 +352,11 @@ const handleUpdate = async () => {
   try {
     await editFormRef.value.validate();
     modalLoading.value = true;
-    const res = await updateUser(editForm);
+
+    // 确保发送到后端的状态是数字
+    const formData = { ...editForm, status: Number(editForm.status) };
+
+    const res = await updateUser(formData);
     if (res.data.code === 0) {
       message.success("更新成功");
       editModalVisible.value = false;
@@ -416,7 +431,11 @@ const handleAdd = async () => {
   try {
     await addFormRef.value.validate();
     modalLoading.value = true;
-    const res = await createUser(addForm);
+
+    // 默认设置为活跃状态
+    const formData = { ...addForm, status: USER_STATUS.ACTIVE.VALUE };
+
+    const res = await createUser(formData);
     if (res.data.code === 0) {
       message.success("添加成功");
       addModalVisible.value = false;

@@ -35,7 +35,7 @@ app.use(pinia);
 app.use(router);
 app.use(Antd);
 app.use(BaiduMap, {
-  ak: "yGxBefxFCGWHDQykxuH514lqKYOiHTLk",
+  ak: "666",
 });
 
 // 全局注册 ECharts 组件

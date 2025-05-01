@@ -15,9 +15,6 @@ export const getUserList = (params: UserListPostBody) => {
     url: "/user/list",
     method: "post",
     data: params,
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
   });
 };
 
@@ -43,9 +40,6 @@ export const getLoginUserStatus = () => {
     url: "/user/loginStatus",
     method: "get",
     params: {},
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
   });
 };
 
@@ -57,7 +51,6 @@ export const updateUser = (params: UserListPostBody) => {
     data: formData,
     headers: {
       "Content-Type": "multipart/form-data",
-      logistics_token: localStorage.getItem("logistics_token") || "",
     },
   });
 };
@@ -77,7 +70,6 @@ export const createUser = (params: AddUserDTO) => {
     data: formData,
     headers: {
       "Content-Type": "multipart/form-data",
-      logistics_token: localStorage.getItem("logistics_token") || "",
     },
   });
 };
@@ -87,9 +79,6 @@ export const getTotalCount = () => {
     url: "/user/total",
     method: "get",
     params: {},
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
   });
 };
 
@@ -98,8 +87,5 @@ export const deleteUser = (params: { name: string }) => {
     url: "/user/delete",
     method: "delete",
     params: params,
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
   });
 };

@@ -5,9 +5,6 @@ export const getOutletView = () => {
     url: "/home/outlet",
     method: "get",
     data: {},
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
   });
 };
 
@@ -16,9 +13,6 @@ export const getOrderView = () => {
     url: "/home/order",
     method: "get",
     data: {},
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
   });
 };
 
@@ -27,9 +21,6 @@ export const getRouteView = () => {
     url: "/home/route",
     method: "get",
     data: {},
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
   });
 };
 
@@ -38,8 +29,5 @@ export const getVehicleView = () => {
     url: "/home/vehicle",
     method: "get",
     data: {},
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
   });
 };

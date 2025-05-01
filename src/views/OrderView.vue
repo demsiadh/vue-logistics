@@ -136,7 +136,6 @@ import zhCN from "ant-design-vue/es/date-picker/locale/zh_CN";
 import "dayjs/locale/zh-cn";
 import {
   getOrderList,
-  getTotalCount,
   createOrder,
   updateOrder,
   deleteOrder,

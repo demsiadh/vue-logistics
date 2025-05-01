@@ -1,13 +1,53 @@
 <template>
   <div class="chat-container">
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <a-button type="primary" block @click="createNewConversation">
+          新对话
+        </a-button>
+      </div>
+      <div class="conversations-list">
+        <a-empty v-if="conversations.length === 0" description="暂无对话" />
+        <div v-else>
+          <div
+            v-for="conv in conversations"
+            :key="conv.id"
+            class="conversation-item"
+            :class="{ active: currentConversationId === conv.id }"
+            @click="switchConversation(conv.id)"
+          >
+            <div class="conversation-header">
+              <span class="conversation-title">{{ conv.title }}</span>
+              <a-popconfirm
+                title="确定要删除此对话吗?"
+                @confirm="deleteConversation(conv.id)"
+                ok-text="是"
+                cancel-text="否"
+              >
+                <a-button type="text" danger size="small">
+                  <template #icon><delete-outlined /></template>
+                </a-button>
+              </a-popconfirm>
+            </div>
+            <span class="conversation-time">{{
+              formatDate(conv.updatedAt)
+            }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
     <a-card class="chat-card" :bordered="false">
       <template #title>
         <div class="chat-header">
-          <span class="title">智能客服助手</span>
-          <a-badge
-            :status="connectionStatus.color"
-            :text="connectionStatus.text"
-          />
+          <span class="title">{{
+            currentConversationTitle || "智能客服助手"
+          }}</span>
+          <div class="header-actions">
+            <a-badge
+              :status="connectionStatus.color"
+              :text="connectionStatus.text"
+            />
+          </div>
         </div>
       </template>
       <div class="chat-content" ref="chatContentRef">
@@ -39,7 +79,9 @@
                 v-else
                 v-html="renderMarkdown(message.content)"
               ></div>
-              <div class="message-time">{{ message.time }}</div>
+              <div class="message-time">
+                {{ formatDate(message.timestamp) }}
+              </div>
             </div>
           </div>
         </template>
@@ -60,12 +102,14 @@
           v-model:value="inputMessage"
           placeholder="请输入您的问题..."
           :rows="3"
-          :disabled="isLoading"
+          :disabled="isLoading || !currentConversationId"
           @keydown.enter="handleEnterPress"
         />
         <a-button
           type="primary"
-          :disabled="!inputMessage.trim() || isLoading"
+          :disabled="
+            !inputMessage.trim() || isLoading || !currentConversationId
+          "
           @click="sendMessage"
           class="send-button"
         >
@@ -77,20 +121,64 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, nextTick, watch } from "vue";
+import {
+  ref,
+  reactive,
+  onMounted,
+  onUnmounted,
+  nextTick,
+  watch,
+  computed,
+} from "vue";
 import { message } from "ant-design-vue";
-import { UserOutlined, RobotOutlined } from "@ant-design/icons-vue";
+import {
+  UserOutlined,
+  RobotOutlined,
+  DeleteOutlined,
+} from "@ant-design/icons-vue";
 import { marked } from "marked";
 
 // 定义消息接口
 interface ChatMessage {
+  id: string;
   role: "user" | "assistant";
   content: string;
-  time: string;
+  timestamp: number;
+  conversationId: string;
 }
+
+// 定义对话接口
+interface Conversation {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// 本地存储键
+const STORAGE_KEYS = {
+  CONVERSATIONS: "chat_conversations",
+  MESSAGES: "chat_messages",
+};
+
+const MESSAGE_RETENTION_DAYS = 7;
 
 // 聊天消息列表
 const messages = ref<ChatMessage[]>([]);
+
+// 对话列表
+const conversations = ref<Conversation[]>([]);
+
+// 当前选中的对话ID
+const currentConversationId = ref<string | null>(null);
+
+// 当前对话标题
+const currentConversationTitle = computed(() => {
+  const conversation = conversations.value.find(
+    (c) => c.id === currentConversationId.value
+  );
+  return conversation ? conversation.title : "";
+});
 
 // 输入消息
 const inputMessage = ref("");
@@ -116,6 +204,18 @@ const connectionStatus = reactive({
 // 跟踪当前正在接收的消息ID
 let currentMessageId = -1;
 
+// 格式化日期
+const formatDate = (timestamp: number) => {
+  const date = new Date(timestamp);
+  return date.toLocaleString("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+};
+
 // 渲染markdown内容
 const renderMarkdown = (content: string) => {
   try {
@@ -126,17 +226,188 @@ const renderMarkdown = (content: string) => {
   }
 };
 
+// 加载对话列表
+const loadConversations = () => {
+  try {
+    const storedConversations = localStorage.getItem(
+      STORAGE_KEYS.CONVERSATIONS
+    );
+    if (storedConversations) {
+      conversations.value = JSON.parse(storedConversations).sort(
+        (a: Conversation, b: Conversation) => b.updatedAt - a.updatedAt
+      );
+    }
+  } catch (error) {
+    console.error("加载对话列表失败:", error);
+  }
+};
+
+// 保存对话列表
+const saveConversations = () => {
+  try {
+    localStorage.setItem(
+      STORAGE_KEYS.CONVERSATIONS,
+      JSON.stringify(conversations.value)
+    );
+  } catch (error) {
+    console.error("保存对话列表失败:", error);
+  }
+};
+
+// 加载消息
+const loadMessages = (conversationId: string) => {
+  try {
+    const storedMessages = localStorage.getItem(STORAGE_KEYS.MESSAGES);
+    if (!storedMessages) {
+      messages.value = [];
+      return;
+    }
+
+    const allMessages: ChatMessage[] = JSON.parse(storedMessages);
+    const now = Date.now();
+    const retentionPeriod = MESSAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000; // 7天的毫秒数
+
+    // 过滤出当前会话的消息，并且不超过7天
+    messages.value = allMessages.filter(
+      (msg) =>
+        msg.conversationId === conversationId &&
+        now - msg.timestamp <= retentionPeriod
+    );
+
+    // 删除过期消息
+    const validMessages = allMessages.filter(
+      (msg) => now - msg.timestamp <= retentionPeriod
+    );
+    if (validMessages.length !== allMessages.length) {
+      localStorage.setItem(
+        STORAGE_KEYS.MESSAGES,
+        JSON.stringify(validMessages)
+      );
+    }
+
+    scrollToBottom();
+  } catch (error) {
+    console.error("加载消息失败:", error);
+    message.error("加载聊天记录失败");
+  }
+};
+
+// 保存消息
+const saveMessages = () => {
+  try {
+    const storedMessages = localStorage.getItem(STORAGE_KEYS.MESSAGES);
+    let allMessages: ChatMessage[] = storedMessages
+      ? JSON.parse(storedMessages)
+      : [];
+
+    // 获取当前会话的所有消息的ID
+    const currentMessageIds = messages.value.map((msg) => msg.id);
+
+    // 删除本地存储中当前会话的旧消息
+    allMessages = allMessages.filter(
+      (msg) => !currentMessageIds.includes(msg.id)
+    );
+
+    // 添加当前会话的最新消息
+    allMessages = [...allMessages, ...messages.value];
+
+    localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(allMessages));
+  } catch (error) {
+    console.error("保存消息失败:", error);
+  }
+};
+
+// 创建新对话
+const createNewConversation = () => {
+  const now = Date.now();
+  const newConversation: Conversation = {
+    id: `conv_${now}`,
+    title: `新对话 ${new Date(now).toLocaleString("zh-CN", {
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })}`,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  conversations.value.unshift(newConversation);
+  saveConversations();
+  switchConversation(newConversation.id);
+};
+
+// 删除对话
+const deleteConversation = (conversationId: string) => {
+  // 从内存中删除会话
+  conversations.value = conversations.value.filter(
+    (c) => c.id !== conversationId
+  );
+  saveConversations();
+
+  // 删除该会话的所有消息
+  const storedMessages = localStorage.getItem(STORAGE_KEYS.MESSAGES);
+  if (storedMessages) {
+    const allMessages: ChatMessage[] = JSON.parse(storedMessages);
+    const filteredMessages = allMessages.filter(
+      (msg) => msg.conversationId !== conversationId
+    );
+    localStorage.setItem(
+      STORAGE_KEYS.MESSAGES,
+      JSON.stringify(filteredMessages)
+    );
+  }
+
+  // 如果删除的是当前会话，切换到第一个会话或创建新会话
+  if (currentConversationId.value === conversationId) {
+    if (conversations.value.length > 0) {
+      switchConversation(conversations.value[0].id);
+    } else {
+      currentConversationId.value = null;
+      messages.value = [];
+      createNewConversation();
+    }
+  }
+};
+
+// 切换对话
+const switchConversation = (conversationId: string) => {
+  if (currentConversationId.value === conversationId) return;
+
+  currentConversationId.value = conversationId;
+  messages.value = [];
+  loadMessages(conversationId);
+
+  // 如果WebSocket已连接，重新连接以包含新的会话ID
+  if (websocket && websocket.readyState === WebSocket.OPEN) {
+    websocket.close();
+    websocket = null;
+    initWebSocket();
+  }
+};
+
+// 更新对话的最后修改时间
+const updateConversationTime = (conversationId: string) => {
+  const conversation = conversations.value.find((c) => c.id === conversationId);
+  if (conversation) {
+    conversation.updatedAt = Date.now();
+    saveConversations();
+  }
+};
+
 // 初始化WebSocket连接
 const initWebSocket = () => {
   try {
     connectionStatus.color = "default";
     connectionStatus.text = "连接中...";
 
-    // 获取认证令牌，使用与API请求相同的方式
+    // 获取认证令牌
     const token = localStorage.getItem("logistics_token") || "";
 
     // 在URL中添加令牌作为查询参数
-    const wsUrl = `ws://localhost:8080/api/llm/chat?logistics_token=${token}`;
+    const wsUrl = `ws://150.158.84.167:8080/api/llm/chat`;
     websocket = new WebSocket(wsUrl);
 
     // 连接建立时触发
@@ -151,24 +422,40 @@ const initWebSocket = () => {
         const data = JSON.parse(event.data);
 
         // 如果是第一条消息，创建新的消息项
-        if (currentMessageId === -1) {
+        if (currentMessageId === -1 && currentConversationId.value) {
           // 添加新的助手消息
-          messages.value.push({
+          const assistantMessage: ChatMessage = {
+            id: `msg_${Date.now()}`,
             role: "assistant",
             content: data.content || "",
-            time: getFormattedTime(),
-          });
+            timestamp: Date.now(),
+            conversationId: currentConversationId.value,
+          };
+
+          messages.value.push(assistantMessage);
+
           // 记录当前消息的索引
           currentMessageId = messages.value.length - 1;
+
+          // 更新对话的最后修改时间
+          updateConversationTime(currentConversationId.value);
+
+          // 保存消息
+          saveMessages();
+
           // 滚动到底部
           scrollToBottom();
-        } else {
+        } else if (currentConversationId.value && currentMessageId !== -1) {
           // 更新已有消息的内容
           if (
             currentMessageId >= 0 &&
             currentMessageId < messages.value.length
           ) {
             messages.value[currentMessageId].content += data.content || "";
+
+            // 保存消息
+            saveMessages();
+
             // 滚动到底部
             scrollToBottom();
           }
@@ -176,6 +463,9 @@ const initWebSocket = () => {
 
         // 如果是最后一条消息，重置状态
         if (data.done) {
+          // 保存最终的消息内容
+          saveMessages();
+
           // 重置当前消息ID和加载状态
           currentMessageId = -1;
           isLoading.value = false;
@@ -204,6 +494,12 @@ const initWebSocket = () => {
         ) {
           messages.value[currentMessageId].content += " [连接已断开]";
           currentMessageId = -1;
+
+          // 保存消息
+          if (currentConversationId.value) {
+            saveMessages();
+          }
+
           scrollToBottom();
         }
       }
@@ -233,20 +529,35 @@ const handleEnterPress = (e: KeyboardEvent) => {
 
 // 发送消息
 const sendMessage = async () => {
-  if (!inputMessage.value.trim() || isLoading.value) return;
+  if (
+    !inputMessage.value.trim() ||
+    isLoading.value ||
+    !currentConversationId.value
+  )
+    return;
 
   if (!websocket || websocket.readyState !== WebSocket.OPEN) {
-    // 不显示错误消息，而是尝试重新连接
+    // 尝试重新连接
     initWebSocket();
     return;
   }
 
   // 将用户消息添加到聊天记录
-  messages.value.push({
+  const userMessage: ChatMessage = {
+    id: `msg_${Date.now()}`,
     role: "user",
     content: inputMessage.value,
-    time: getFormattedTime(),
-  });
+    timestamp: Date.now(),
+    conversationId: currentConversationId.value,
+  };
+
+  messages.value.push(userMessage);
+
+  // 更新对话的最后修改时间
+  updateConversationTime(currentConversationId.value);
+
+  // 保存消息
+  saveMessages();
 
   // 设置加载状态
   isLoading.value = true;
@@ -268,18 +579,8 @@ const sendMessage = async () => {
     scrollToBottom();
   } catch (error) {
     isLoading.value = false;
-    // 不显示错误消息
     console.error("发送消息失败:", error);
   }
-};
-
-// 获取格式化的时间
-const getFormattedTime = () => {
-  const now = new Date();
-  return `${now.getHours().toString().padStart(2, "0")}:${now
-    .getMinutes()
-    .toString()
-    .padStart(2, "0")}`;
 };
 
 // 滚动到底部
@@ -296,16 +597,21 @@ watch(messages, () => {
   scrollToBottom();
 });
 
-// 组件挂载时初始化WebSocket
+// 组件挂载时加载对话列表和初始化WebSocket
 onMounted(() => {
-  initWebSocket();
+  // 加载对话列表
+  loadConversations();
 
-  // 添加欢迎消息
-  messages.value.push({
-    role: "assistant",
-    content: "您好！我是您的智能客服助手，有什么可以帮您解决的问题吗？",
-    time: getFormattedTime(),
-  });
+  // 如果没有对话，创建一个新对话
+  if (conversations.value.length === 0) {
+    createNewConversation();
+  } else {
+    // 选择最新的对话
+    switchConversation(conversations.value[0].id);
+  }
+
+  // 初始化WebSocket
+  initWebSocket();
 });
 
 // 组件卸载时关闭WebSocket连接
@@ -323,9 +629,70 @@ onUnmounted(() => {
   max-width: 1200px;
   margin: 0 auto;
   height: calc(100vh - 80px);
+  display: flex;
+  gap: 24px;
+}
+
+.sidebar {
+  width: 250px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.conversations-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.conversation-item {
+  padding: 12px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  transition: background-color 0.2s;
+}
+
+.conversation-item:hover {
+  background-color: #f5f5f5;
+}
+
+.conversation-item.active {
+  background-color: #e6f7ff;
+}
+
+.conversation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.conversation-title {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-time {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
 }
 
 .chat-card {
+  flex: 1;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -340,6 +707,12 @@ onUnmounted(() => {
 .chat-header .title {
   font-weight: bold;
   font-size: 16px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .chat-content {

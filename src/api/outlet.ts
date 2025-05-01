@@ -15,9 +15,6 @@ export const getOutletList = (params: OutletListPostBody) => {
     url: "/outlet/list",
     method: "post",
     data: params,
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
   });
 };
 
@@ -41,7 +38,6 @@ export const updateOutlet = (params: UpdateOutletDTO) => {
     data: formData,
     headers: {
       "Content-Type": "multipart/form-data",
-      logistics_token: localStorage.getItem("logistics_token") || "",
     },
   });
 };
@@ -67,7 +63,6 @@ export const createOutlet = (params: CreateOutletDTO) => {
     data: formData,
     headers: {
       "Content-Type": "multipart/form-data",
-      logistics_token: localStorage.getItem("logistics_token") || "",
     },
   });
 };
@@ -77,9 +72,6 @@ export const getTotalCount = () => {
     url: "/outlet/total",
     method: "get",
     params: {},
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
   });
 };
 
@@ -90,9 +82,6 @@ export const deleteOutlet = (params: string) => {
     params: {
       outletId: params,
     },
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
   });
 };
 export const getAllProvincesAndCities = () => {
@@ -100,8 +89,5 @@ export const getAllProvincesAndCities = () => {
     url: "/outlet/allProvincesAndCities",
     method: "get",
     params: {},
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
   });
 };

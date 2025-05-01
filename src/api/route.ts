@@ -15,9 +15,6 @@ export const getRouteList = (params: RouteListPostBody) => {
     url: "/route/list",
     method: "post",
     data: params,
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
   });
 };
 
@@ -39,7 +36,6 @@ export const updateRoute = (params: UpdateRouteDTO) => {
     data: formData,
     headers: {
       "Content-Type": "multipart/form-data",
-      logistics_token: localStorage.getItem("logistics_token") || "",
     },
   });
 };
@@ -61,7 +57,6 @@ export const createRoute = (params: CreateRouteDTO) => {
     data: formData,
     headers: {
       "Content-Type": "multipart/form-data",
-      logistics_token: localStorage.getItem("logistics_token") || "",
     },
   });
 };
@@ -71,9 +66,6 @@ export const getRouteTotalCount = () => {
     url: "/route/total",
     method: "get",
     params: {},
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
   });
 };
 
@@ -83,9 +75,6 @@ export const deleteRoute = (routeId: string) => {
     method: "delete",
     params: {
       routeId: routeId,
-    },
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
     },
   });
 };

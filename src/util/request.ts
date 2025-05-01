@@ -11,7 +11,9 @@ const axiosUtil = axios.create({
   baseURL: "http://localhost:8080/api",
   timeout: 10000,
   withCredentials: true,
-  headers: { "Logistics-Custom-Header": "logistics" },
+  headers: {
+    logistics_token: localStorage.getItem("logistics_token") || "",
+  },
 });
 // 添加请求拦截器
 axiosUtil.interceptors.request.use(

@@ -16,9 +16,6 @@ export const getVehicleList = (params: vehicleListPostBody) => {
     url: "/vehicle/list",
     method: "post",
     data: params,
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
   });
 };
 
@@ -39,7 +36,6 @@ export const updatevehicle = (params: UpdatevehicleDTO) => {
     data: formData,
     headers: {
       "Content-Type": "multipart/form-data",
-      logistics_token: localStorage.getItem("logistics_token") || "",
     },
   });
 };
@@ -61,7 +57,6 @@ export const createvehicle = (params: CreatevehicleDTO) => {
     data: formData,
     headers: {
       "Content-Type": "multipart/form-data",
-      logistics_token: localStorage.getItem("logistics_token") || "",
     },
   });
 };
@@ -71,9 +66,6 @@ export const getTotalCount = () => {
     url: "/vehicle/total",
     method: "get",
     params: {},
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
   });
 };
 
@@ -83,9 +75,6 @@ export const deletevehicle = (params: string) => {
     method: "delete",
     params: {
       plateNumber: params,
-    },
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
     },
   });
 };

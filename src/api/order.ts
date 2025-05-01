@@ -16,9 +16,6 @@ export const getOrderList = (params: OrderListPostBody) => {
     url: "/order/list",
     method: "post",
     data: params,
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
   });
 };
 
@@ -39,7 +36,6 @@ export const updateOrder = (params: UpdateOrderDTO) => {
     data: formData,
     headers: {
       "Content-Type": "multipart/form-data",
-      logistics_token: localStorage.getItem("logistics_token") || "",
     },
   });
 };
@@ -60,7 +56,6 @@ export const createOrder = (params: CreateOrderDTO) => {
     data: formData,
     headers: {
       "Content-Type": "multipart/form-data",
-      logistics_token: localStorage.getItem("logistics_token") || "",
     },
   });
 };
@@ -70,9 +65,6 @@ export const getTotalCount = () => {
     url: "/order/total",
     method: "get",
     params: {},
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
-    },
   });
 };
 
@@ -82,9 +74,6 @@ export const deleteOrder = (params: string) => {
     method: "delete",
     params: {
       orderId: params,
-    },
-    headers: {
-      logistics_token: localStorage.getItem("logistics_token") || "",
     },
   });
 };

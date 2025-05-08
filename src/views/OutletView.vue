@@ -304,20 +304,40 @@
                 </a-collapse-panel>
               </a-collapse>
             </a-form-item>
+            <a-form-item label="位置状态">
+              <a-tag
+                :color="pointInsideScope ? 'success' : 'error'"
+                v-if="
+                  outletForm.scope &&
+                  outletForm.scope.length >= 3 &&
+                  outletForm.lng &&
+                  outletForm.lat
+                "
+              >
+                {{
+                  pointInsideScope ? "位置在营业范围内" : "位置不在营业范围内"
+                }}
+              </a-tag>
+              <span v-else>未设置完整营业范围或位置</span>
+            </a-form-item>
           </a-form>
         </div>
 
         <!-- 地图部分 -->
         <div class="map-container">
+          <div v-if="loadingMap" class="map-loading">
+            <a-spin tip="地图加载中..."></a-spin>
+          </div>
           <baidu-map
-            v-if="modalVisible"
-            @unload="handleMapUnload"
+            v-if="modalVisible && mapReady"
+            :key="'bmap-' + modalVisible + '-' + mapReady"
             class="bmap"
             :center="mapCenter"
             :zoom="mapZoom"
             :scroll-wheel-zoom="true"
             @click="handleMapClick"
             @ready="handleMapReady"
+            @error="(e: any) => console.error('Baidu Map error:', e)"
             ak="yGxBefxFCGWHDQykxuH514lqKYOiHTLk"
             :mapOptions="{
               enableMapClick: !outletForm.id,
@@ -431,8 +451,9 @@ import {
   onMounted,
   onBeforeUnmount,
   watch,
+  h,
 } from "vue";
-import { message } from "ant-design-vue";
+import { message, Modal } from "ant-design-vue";
 import {
   PlusOutlined,
   EnvironmentOutlined,
@@ -456,34 +477,142 @@ import {
   updateOutlet,
   createOutlet,
   deleteOutlet,
-  getTotalCount,
   getAllProvincesAndCities,
 } from "@/api/outlet";
 import { CHINA_PROVINCES } from "@/config/constants";
+
+// 添加BMap类型声明
+declare global {
+  interface Window {
+    BMap: any;
+  }
+}
+
+// 添加一个检查百度地图API是否加载的辅助函数
+const checkBaiduMapAPILoaded = () => {
+  return new Promise<void>((resolve, reject) => {
+    const maxAttempts = 10;
+    let attempts = 0;
+
+    const checkAPI = () => {
+      attempts++;
+      if (window.BMap) {
+        resolve();
+      } else if (attempts >= maxAttempts) {
+        reject(new Error("Baidu Map API load timeout"));
+      } else {
+        setTimeout(checkAPI, 500);
+      }
+    };
+
+    checkAPI();
+  });
+};
+
 // 新增组件状态跟踪
 let isComponentMounted = true;
-const cleanupCallbacks: (() => void)[] = [];
 
 // 百度地图实例管理
 const baiduMapInstance = ref<any>(null);
-const mapEventListeners: any[] = [];
+const loadingMap = ref(false);
 
-// 地图加载完成回调
+// 添加地图准备状态
+const mapReady = ref(false);
+
+// 百度地图相关 - 编辑地图
+const mapCenter = ref({ lng: 116.404, lat: 39.915 });
+const mapZoom = ref(12);
+
+// 弹窗相关
+const modalVisible = ref(false);
+const modalLoading = ref(false);
+const modalTitle = ref("添加网点");
+const outletFormRef = ref();
+const outletForm = reactive<any>({
+  id: "",
+  name: "",
+  phone: "",
+  province: "",
+  city: "",
+  detailAddress: "",
+  businessHours: "09:00-18:00",
+  lng: "",
+  lat: "",
+  status: 1,
+  remark: "",
+  scope: [],
+});
+
+// 添加一个提示标签，显示位置是否在营业范围内
+const pointInsideScope = ref<boolean>(true);
+
+// 监听模态框可见性，重置地图状态
+watch(modalVisible, (visible) => {
+  if (visible) {
+    // 延迟一下再初始化地图，确保DOM已经渲染
+    setTimeout(() => {
+      mapReady.value = true;
+    }, 200);
+  } else {
+    handleMapUnload();
+    mapReady.value = false;
+  }
+});
+
+// 修改地图加载完成回调
 const handleMapReady = ({ BMap, map }: any) => {
-  if (!isComponentMounted) return;
-
+  loadingMap.value = false;
   baiduMapInstance.value = map;
   window.BMap = BMap;
+  mapReady.value = true;
 
-  // 添加地图事件监听
-  const listener = map.addEventListener("click", handleMapClick);
-  mapEventListeners.push(() => map.removeEventListener(listener));
+  // 确保地图正确加载并设置中心点
+  if (outletForm.lng && outletForm.lat) {
+    try {
+      const point = new BMap.Point(
+        parseFloat(outletForm.lng),
+        parseFloat(outletForm.lat)
+      );
+
+      // 如果有营业范围点，计算包含所有点的边界
+      if (outletForm.scope && outletForm.scope.length > 0) {
+        // 创建一个边界对象
+        const bounds = new BMap.Bounds();
+
+        // 添加网点本身的位置
+        bounds.extend(point);
+
+        // 添加所有营业范围点
+        outletForm.scope.forEach((scopePoint: MapPoint) => {
+          const pt = new BMap.Point(
+            scopePoint.coordinates[0],
+            scopePoint.coordinates[1]
+          );
+          bounds.extend(pt);
+        });
+
+        // 设置视图以包含所有点
+        map.setViewport(bounds);
+      } else {
+        // 没有营业范围点，仅居中显示网点位置
+        map.centerAndZoom(point, 15);
+      }
+    } catch (e) {
+      console.error("Error setting map center:", e);
+    }
+  } else {
+    // 默认中心点
+    try {
+      const point = new BMap.Point(116.404, 39.915);
+      map.centerAndZoom(point, 12);
+    } catch (e) {
+      console.error("Error setting default map center:", e);
+    }
+  }
 };
 
 // 地图卸载处理
 const handleMapUnload = () => {
-  mapEventListeners.forEach((fn) => fn());
-  mapEventListeners.length = 0;
   baiduMapInstance.value = null;
   window.BMap = null;
 };
@@ -678,30 +807,6 @@ interface Outlet {
 
 const outletList = ref<Outlet[]>([]);
 
-// 百度地图相关 - 编辑地图
-const mapCenter = ref({ lng: 116.404, lat: 39.915 });
-const mapZoom = ref(12);
-
-// 添加组件卸载前的清理函数
-onBeforeUnmount(() => {
-  isComponentMounted = false;
-  handleMapUnload();
-  isAddingScopePoint.value = false;
-  outletForm.scope = [];
-});
-
-// 重置和清理
-const resetMapAndFormState = () => {
-  // 重置地图相关状态
-  isAddingScopePoint.value = false;
-  baiduMapInstance.value = null;
-
-  // 避免直接修改 outletForm，而是赋值一个新对象
-  if (outletForm.scope) {
-    outletForm.scope = [];
-  }
-};
-
 // 添加类型定义
 interface MapPoint {
   type: string;
@@ -725,7 +830,32 @@ const updateMarkerPosition = (point: any) => {
   outletForm.lat = lat.toFixed(6);
 };
 
-// 修改地图点击事件处理
+// 处理地图点击事件或标记拖动后，更新位置状态
+const updatePointInsideStatus = () => {
+  if (
+    !outletForm.scope ||
+    outletForm.scope.length < 3 ||
+    !outletForm.lng ||
+    !outletForm.lat
+  ) {
+    pointInsideScope.value = true;
+    return;
+  }
+
+  const point = {
+    lng: parseFloat(outletForm.lng),
+    lat: parseFloat(outletForm.lat),
+  };
+
+  const polygon = outletForm.scope.map((p: MapPoint) => ({
+    lng: p.coordinates[0],
+    lat: p.coordinates[1],
+  }));
+
+  pointInsideScope.value = isPointInsidePolygon(point, polygon);
+};
+
+// 在地图点击事件中添加位置检查
 const handleMapClick = (e: any) => {
   if (!modalVisible.value) return;
 
@@ -744,7 +874,9 @@ const handleMapClick = (e: any) => {
 
     // 创建一个新数组，避免直接修改
     outletForm.scope = [...outletForm.scope, point];
-    message.success(`已添加第 ${outletForm.scope.length} 个范围点`);
+
+    // 更新点的位置状态
+    updatePointInsideStatus();
   } else {
     updateMarkerPosition(e.point);
     // 使用逆地理编码服务获取地址信息
@@ -767,6 +899,9 @@ const handleMapClick = (e: any) => {
           if (address) {
             outletForm.detailAddress = address;
           }
+
+          // 更新点的位置状态
+          updatePointInsideStatus();
         }
       });
     }
@@ -778,27 +913,10 @@ const handleMarkerDragend = (e: any) => {
   // 如果是编辑模式，禁用拖动
   if (outletForm.id) return;
   updateMarkerPosition(e.point);
-};
 
-// 弹窗相关
-const modalVisible = ref(false);
-const modalLoading = ref(false);
-const modalTitle = ref("添加网点");
-const outletFormRef = ref();
-const outletForm = reactive<any>({
-  id: "",
-  name: "",
-  phone: "",
-  province: "",
-  city: "",
-  detailAddress: "",
-  businessHours: "09:00-18:00",
-  lng: "",
-  lat: "",
-  status: 1,
-  remark: "",
-  scope: [],
-});
+  // 更新点的位置状态
+  updatePointInsideStatus();
+};
 
 // 表单验证规则
 const formRules = {
@@ -865,20 +983,8 @@ const fetchOutletList = async () => {
 
     if (response.data.code === 0) {
       if (response.data.data && Array.isArray(response.data.data)) {
-        // 预处理营业范围数据，统一格式
-        const processedData = response.data.data.map((outlet: Outlet) => {
-          if (outlet.scope && Array.isArray(outlet.scope)) {
-            // 不修改原始数据，返回处理后的新对象
-            return {
-              ...outlet,
-            };
-          }
-          return outlet;
-        });
-
-        outletList.value = processedData;
-        // 使用获取到的数据长度作为总数
-        pagination.total = processedData.length;
+        outletList.value = response.data.data;
+        pagination.total = response.data.data.length;
       } else {
         outletList.value = [];
         pagination.total = 0;
@@ -948,7 +1054,7 @@ const confirmScope = () => {
   message.success("营业范围已确认");
 };
 
-// 添加多边形更新事件处理
+// 处理多边形更新
 const handlePolygonUpdate = (e: any) => {
   // 如果是编辑模式，禁用更新
   if (outletForm.id) return;
@@ -959,6 +1065,9 @@ const handlePolygonUpdate = (e: any) => {
       type: "Point",
       coordinates: [point.lng, point.lat],
     }));
+
+    // 更新点的位置状态
+    updatePointInsideStatus();
   }
 };
 
@@ -986,6 +1095,9 @@ const handleScopePointDragend = (
     const newScope = [...outletForm.scope];
     newScope[index] = newPoint;
     outletForm.scope = newScope;
+
+    // 更新点的位置状态
+    updatePointInsideStatus();
   } catch (error) {
     console.error("更新范围点位置失败:", error);
   }
@@ -1014,12 +1126,19 @@ const showAddModal = () => {
   isAddingScopePoint.value = false;
   mapCenter.value = { lng: 116.404, lat: 39.915 };
   mapZoom.value = 12;
+  loadingMap.value = true;
+  pointInsideScope.value = true;
 
   // 设置默认的时间选择器值
   startTime.value = dayjs("09:00", "HH:mm");
   endTime.value = dayjs("18:00", "HH:mm");
 
   modalVisible.value = true;
+
+  // 延迟初始化地图
+  setTimeout(() => {
+    mapReady.value = true;
+  }, 300);
 };
 
 // 显示编辑弹窗
@@ -1043,6 +1162,9 @@ const showEditModal = async (record: Outlet) => {
       remark: "",
       scope: [],
     });
+
+    // 重置状态
+    pointInsideScope.value = true;
 
     // 设置新的数据
     Object.assign(outletForm, recordCopy);
@@ -1078,20 +1200,24 @@ const showEditModal = async (record: Outlet) => {
         console.error("解析营业范围数据失败:", error);
         outletForm.scope = [];
       }
+
+      // 检查点是否在区域内
+      updatePointInsideStatus();
     } else {
       outletForm.scope = [];
     }
 
     // 重置地图相关状态
     isAddingScopePoint.value = false;
+    loadingMap.value = true;
 
-    // 设置地图中心为网点位置
+    // 设置地图中心为网点位置 - 不再在这里设置地图缩放和中心，让 handleMapReady 处理
     if (outletForm.lng && outletForm.lat) {
       mapCenter.value = {
         lng: parseFloat(outletForm.lng),
         lat: parseFloat(outletForm.lat),
       };
-      mapZoom.value = 15;
+      // 不设置缩放级别，让地图自动适应所有点
     }
 
     // 解析营业时间
@@ -1101,20 +1227,38 @@ const showEditModal = async (record: Outlet) => {
       endTime.value = dayjs(end, "HH:mm");
     }
 
-    // 使用 nextTick 确保数据更新后再显示弹窗
-    await nextTick();
     modalVisible.value = true;
+
+    // 延迟初始化地图
+    setTimeout(() => {
+      mapReady.value = true;
+    }, 300);
   } catch (error) {
     console.error("显示编辑弹窗失败:", error);
     message.error("显示编辑弹窗失败");
   }
 };
 
+// 监听输入框的经纬度变化，检查点是否在范围内
+watch(
+  () => [outletForm.lng, outletForm.lat],
+  () => {
+    if (outletForm.lng && outletForm.lat) {
+      updatePointInsideStatus();
+    }
+  }
+);
+
 // 处理弹窗关闭之后的事件
 const handleModalAfterClose = () => {
   handleMapUnload();
   isAddingScopePoint.value = false;
   outletForm.scope = [];
+
+  // 清理地图资源
+  mapReady.value = false;
+  baiduMapInstance.value = null;
+  window.BMap = null;
 };
 
 // 修改处理弹窗取消方法
@@ -1132,6 +1276,45 @@ const handleModalOk = async () => {
     const phoneRegex = /^0\d{2,3}-\d{7,8}$/;
     if (!phoneRegex.test(outletForm.phone)) {
       throw new Error("联系电话格式不正确");
+    }
+
+    // 判断网点位置是否在营业范围内
+    if (
+      outletForm.scope &&
+      outletForm.scope.length >= 3 &&
+      outletForm.lng &&
+      outletForm.lat
+    ) {
+      const pointInside = isPointInsidePolygon(
+        { lng: parseFloat(outletForm.lng), lat: parseFloat(outletForm.lat) },
+        outletForm.scope.map((p: MapPoint) => ({
+          lng: p.coordinates[0],
+          lat: p.coordinates[1],
+        }))
+      );
+
+      if (!pointInside) {
+        // 显示确认对话框
+        const confirmed = await new Promise<boolean>((resolve) => {
+          Modal.confirm({
+            title: "提示",
+            content: "网点位置不在营业范围内，是否继续保存？",
+            okText: "继续保存",
+            cancelText: "取消",
+            onOk: () => {
+              resolve(true);
+            },
+            onCancel: () => {
+              resolve(false);
+            },
+          });
+        });
+
+        if (!confirmed) {
+          modalLoading.value = false;
+          return;
+        }
+      }
     }
 
     const submitData = {
@@ -1163,6 +1346,32 @@ const handleModalOk = async () => {
       modalLoading.value = false;
     }
   }
+};
+
+// 判断点是否在多边形内部（射线法）
+const isPointInsidePolygon = (
+  point: { lng: number; lat: number },
+  polygon: Array<{ lng: number; lat: number }>
+): boolean => {
+  // 如果多边形点数小于3，无法形成有效区域
+  if (polygon.length < 3) return false;
+
+  let inside = false;
+  const x = point.lng;
+  const y = point.lat;
+
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].lng;
+    const yi = polygon[i].lat;
+    const xj = polygon[j].lng;
+    const yj = polygon[j].lat;
+
+    const intersect =
+      yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+
+  return inside;
 };
 
 // 修改 handleDelete 方法
@@ -1277,10 +1486,25 @@ const scopePointsList = computed(() => {
   }));
 });
 
+// 添加组件卸载前的清理函数
+onBeforeUnmount(() => {
+  isComponentMounted = false;
+  handleMapUnload();
+  isAddingScopePoint.value = false;
+  outletForm.scope = [];
+});
+
 // 初始化
-onMounted(() => {
+onMounted(async () => {
   fetchOutletList();
   fetchProvincesAndCities();
+
+  // 预加载百度地图API
+  try {
+    await checkBaiduMapAPILoaded();
+  } catch (error) {
+    console.error("Failed to load Baidu Map API:", error);
+  }
 });
 </script>
 
@@ -1337,12 +1561,38 @@ onMounted(() => {
   flex-direction: column;
   margin-left: 16px;
   position: relative;
+  min-height: 450px;
+  height: 100%;
 }
 
 .bmap {
   flex: 1;
   width: 100%;
-  height: 450px;
+  height: 450px !important;
+  min-height: 450px !important;
+}
+
+/* 确保百度地图内部元素填充整个容器 */
+:deep(.BMap_mask) {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+:deep(.BMap_cpyCtrl) {
+  display: none;
+}
+
+.map-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.7);
+  z-index: 1000;
 }
 
 .locate-button-container {
@@ -1391,19 +1641,6 @@ onMounted(() => {
 .map-tools-right {
   display: flex;
   gap: 8px;
-}
-
-.map-container {
-  height: 500px;
-  margin-bottom: 16px;
-  border: 1px solid #d9d9d9;
-  border-radius: 2px;
-  position: relative;
-}
-
-.bmap {
-  height: 100%;
-  width: 100%;
 }
 
 .scope-info {

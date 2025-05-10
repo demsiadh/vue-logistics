@@ -130,6 +130,18 @@
           />
           <span class="unit">吨</span>
         </a-form-item>
+        <a-form-item label="当前负载" name="currentLoad">
+          <a-input-number
+            v-model:value="vehicleForm.currentLoad"
+            :min="0"
+            :max="100"
+            :precision="2"
+            placeholder="请输入当前负载"
+            :step="0.1"
+            style="width: 100%"
+          />
+          <span class="unit">吨</span>
+        </a-form-item>
         <a-form-item label="车辆状态" name="status">
           <a-select v-model:value="vehicleForm.status">
             <a-select-option value="1">运行中</a-select-option>
@@ -263,12 +275,13 @@ interface RouteData {
   endOutlet: string;
 }
 
-// 修改 VehicleData 接口，添加 route 字段
+// 修改 VehicleData 接口
 interface VehicleData {
   id: string;
   plateNumber: string;
   type: string;
   loadCapacity: number;
+  currentLoad: number;
   status: string;
   routeId?: string;
   routeName?: string;
@@ -308,6 +321,11 @@ const columns = [
     title: "载重量(吨)",
     dataIndex: "loadCapacity",
     key: "loadCapacity",
+  },
+  {
+    title: "当前负载(吨)",
+    dataIndex: "currentLoad",
+    key: "currentLoad",
   },
   {
     title: "所属线路ID",
@@ -379,6 +397,7 @@ const vehicleForm = reactive<VehicleData>({
   plateNumber: "",
   type: "",
   loadCapacity: 0,
+  currentLoad: 0,
   status: "空闲",
   routeId: "",
   routeName: "",
@@ -410,6 +429,10 @@ const formRules = {
   loadCapacity: [
     { required: true, message: "请输入载重量" },
     { type: "number", min: 0.1, message: "载重量必须大于0" },
+  ],
+  currentLoad: [
+    { required: true, message: "请输入当前负载" },
+    { type: "number", min: 0, message: "当前负载不能小于0" },
   ],
   status: [{ required: true, message: "请选择车辆状态" }],
 };
@@ -619,6 +642,7 @@ const showAddModal = () => {
   vehicleForm.plateNumber = "";
   vehicleForm.type = "1";
   vehicleForm.loadCapacity = 0;
+  vehicleForm.currentLoad = 0;
   vehicleForm.status = "3";
   vehicleForm.routeId = "";
   vehicleForm.lng = "";
@@ -676,11 +700,12 @@ const handleModalOk = () => {
     // 构建提交数据
     const submitData = {
       ...vehicleForm,
-      loadCapacity: vehicleForm.loadCapacity.toString(), // 转换为字符串
-      routeId: vehicleForm.routeId || "", // 确保 routeId 不是 undefined
-      remarks: vehicleForm.remarks || "", // 确保 remarks 不是 undefined
-      lng: vehicleForm.lng || "", // 经度
-      lat: vehicleForm.lat || "", // 纬度
+      loadCapacity: vehicleForm.loadCapacity.toString(),
+      currentLoad: vehicleForm.currentLoad.toString(),
+      routeId: vehicleForm.routeId || "",
+      remarks: vehicleForm.remarks || "",
+      lng: vehicleForm.lng || "",
+      lat: vehicleForm.lat || "",
     };
 
     // 根据是新增还是编辑调用不同API

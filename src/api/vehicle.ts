@@ -25,6 +25,7 @@ interface UpdatevehicleDTO {
   plateNumber: string;
   type: string;
   loadCapacity: string;
+  currentLoad: string;
   status: string;
   routeId: string;
   remarks: string;
@@ -48,6 +49,7 @@ interface CreatevehicleDTO {
   plateNumber: string;
   type: string;
   loadCapacity: string;
+  currentLoad: string;
   status: string;
   routeId: string;
   remarks: string;

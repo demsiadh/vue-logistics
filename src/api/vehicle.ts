@@ -7,8 +7,10 @@ interface vehicleListPostBody {
   status: number;
   routeId: string;
   routeName: string;
-  skip: number;
-  limit: number;
+  page: {
+    skip: number;
+    limit: number;
+  };
 }
 
 export const getVehicleList = (params: vehicleListPostBody) => {
@@ -26,6 +28,8 @@ interface UpdatevehicleDTO {
   status: string;
   routeId: string;
   remarks: string;
+  lng?: string;
+  lat?: string;
 }
 
 export const updatevehicle = (params: UpdatevehicleDTO) => {
@@ -47,6 +51,8 @@ interface CreatevehicleDTO {
   status: string;
   routeId: string;
   remarks: string;
+  lng?: string;
+  lat?: string;
 }
 
 export const createvehicle = (params: CreatevehicleDTO) => {

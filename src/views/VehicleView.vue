@@ -97,6 +97,7 @@
       @ok="handleModalOk"
       @cancel="handleModalCancel"
       :confirmLoading="modalLoading"
+      width="800px"
     >
       <a-form
         :model="vehicleForm"
@@ -140,6 +141,70 @@
             placeholder="请输入线路ID"
           />
         </a-form-item>
+        <a-form-item label="当前位置" name="location">
+          <div class="map-container">
+            <baidu-map
+              class="map"
+              :center="mapCenter"
+              :zoom="mapZoom"
+              :scroll-wheel-zoom="true"
+              :auto-resize="false"
+              @click="handleMapClick"
+              ref="baiduMapRef"
+              @ready="handleMapReady"
+            >
+              <bm-marker
+                v-if="vehicleLocation.lng && vehicleLocation.lat"
+                :position="vehicleLocation"
+                :dragging="true"
+                @dragend="handleMarkerDragend"
+              >
+                <bm-label
+                  :content="vehicleForm.plateNumber || '车辆位置'"
+                  :offset="{ width: 0, height: -30 }"
+                />
+              </bm-marker>
+              <template v-if="vehicleForm.route">
+                <bm-polyline
+                  :path="parseRoutePoints(vehicleForm.route.points)"
+                  :stroke-color="'#1890ff'"
+                  :stroke-weight="3"
+                  :stroke-opacity="0.8"
+                />
+              </template>
+              <bm-navigation anchor="BMAP_ANCHOR_TOP_LEFT"></bm-navigation>
+              <bm-scale anchor="BMAP_ANCHOR_BOTTOM_LEFT"></bm-scale>
+            </baidu-map>
+            <!-- 添加定位按钮 -->
+            <div class="locate-button-container">
+              <a-button
+                type="default"
+                class="locate-button"
+                :disabled="!vehicleLocation.lng && !vehicleForm.route?.points"
+                @click="locateToVehicle"
+              >
+                <template #icon><environment-outlined /></template>
+              </a-button>
+            </div>
+          </div>
+          <div class="location-controls">
+            <a-space>
+              <span v-if="vehicleLocation.lng && vehicleLocation.lat">
+                当前位置：经度 {{ vehicleLocation.lng.toFixed(6) }}, 纬度
+                {{ vehicleLocation.lat.toFixed(6) }}
+              </span>
+              <a-button
+                type="primary"
+                size="small"
+                @click="clearLocation"
+                v-if="vehicleLocation.lng && vehicleLocation.lat"
+              >
+                清除位置
+              </a-button>
+              <span v-else>点击地图设置车辆位置</span>
+            </a-space>
+          </div>
+        </a-form-item>
         <a-form-item label="备注" name="remarks">
           <a-textarea
             v-model:value="vehicleForm.remarks"
@@ -155,8 +220,16 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from "vue";
 import { message } from "ant-design-vue";
-import { PlusOutlined } from "@ant-design/icons-vue";
+import { PlusOutlined, EnvironmentOutlined } from "@ant-design/icons-vue";
 import type { TablePaginationConfig } from "ant-design-vue";
+import {
+  BaiduMap,
+  BmMarker,
+  BmNavigation,
+  BmScale,
+  BmLabel,
+  BmPolyline,
+} from "vue-baidu-map-3x";
 import {
   getTotalCount,
   getVehicleList,
@@ -170,18 +243,38 @@ interface Point {
   lat: number;
 }
 
-// 定义车辆接口
+// 添加 RouteData 接口
+interface RouteData {
+  id: string;
+  routeId: string;
+  name: string;
+  type: number;
+  status: number;
+  description: string;
+  points: Array<{
+    Type: string;
+    Coordinates: [number, number];
+  }>;
+  distance: number;
+  startOutlet: string;
+  endOutlet: string;
+}
+
+// 修改 VehicleData 接口，添加 route 字段
 interface VehicleData {
   id: string;
   plateNumber: string;
   type: string;
   loadCapacity: number;
   status: string;
-  routeId?: string; // 关联的线路ID
-  routeName?: string; // 关联的线路名称
-  remarks?: string; // 备注信息
+  routeId?: string;
+  routeName?: string;
+  remarks?: string;
+  lng?: string;
+  lat?: string;
   createTime?: string;
   updateTime?: string;
+  route?: RouteData; // 添加 route 字段
 }
 
 // 搜索表单数据
@@ -277,7 +370,18 @@ const vehicleForm = reactive<VehicleData>({
   routeId: "",
   routeName: "",
   remarks: "",
+  lng: "",
+  lat: "",
 });
+
+// 地图相关
+const mapCenter = ref({ lng: 116.404, lat: 39.915 });
+const mapZoom = ref(12);
+const baiduMapRef = ref(null);
+const baiduMapInstance = ref<any>(null);
+
+// 车辆位置
+const vehicleLocation = reactive<Point>({ lng: 0, lat: 0 });
 
 // 表单验证规则
 const formRules = {
@@ -330,6 +434,100 @@ const getStatusColor = (status: string | number) => {
   return colorMap[statusStr] || "default";
 };
 
+// 处理地图点击事件
+const handleMapClick = (e: any) => {
+  const lng = e.point.lng;
+  const lat = e.point.lat;
+
+  vehicleLocation.lng = lng;
+  vehicleLocation.lat = lat;
+
+  // 更新地图中心
+  mapCenter.value = { lng, lat };
+
+  // 将位置信息转换为JSON字符串并保存到表单
+  updateLocationField();
+
+  message.success("已设置车辆位置");
+};
+
+// 处理标记拖拽结束
+const handleMarkerDragend = (e: any) => {
+  const lng = e.point.lng;
+  const lat = e.point.lat;
+
+  vehicleLocation.lng = lng;
+  vehicleLocation.lat = lat;
+
+  // 将位置信息转换为JSON字符串并保存到表单
+  updateLocationField();
+
+  message.success("已更新车辆位置");
+};
+
+// 更新location字段
+const updateLocationField = () => {
+  if (vehicleLocation.lng !== 0 && vehicleLocation.lat !== 0) {
+    vehicleForm.lng = vehicleLocation.lng.toString();
+    vehicleForm.lat = vehicleLocation.lat.toString();
+  } else {
+    vehicleForm.lng = "";
+    vehicleForm.lat = "";
+  }
+};
+
+// 清除位置
+const clearLocation = () => {
+  vehicleLocation.lng = 0;
+  vehicleLocation.lat = 0;
+  vehicleForm.lng = "";
+  vehicleForm.lat = "";
+  message.success("已清除车辆位置");
+};
+
+// 解析位置信息
+const parseLocationFromString = (lng?: string, lat?: string): Point => {
+  if (!lng || !lat) {
+    return { lng: 0, lat: 0 };
+  }
+
+  try {
+    const lngNum = parseFloat(lng);
+    const latNum = parseFloat(lat);
+
+    if (!isNaN(lngNum) && !isNaN(latNum)) {
+      return {
+        lng: lngNum,
+        lat: latNum,
+      };
+    }
+  } catch (error) {
+    console.error("解析位置信息失败:", error);
+  }
+
+  return { lng: 0, lat: 0 };
+};
+
+// 地图加载完成
+const handleMapReady = (e: any) => {
+  baiduMapInstance.value = e.map;
+  // 如果已有线路数据，调整视图以显示整个线路
+  if (
+    vehicleForm.route &&
+    vehicleForm.route.points &&
+    vehicleForm.route.points.length > 0
+  ) {
+    const points = parseRoutePoints(vehicleForm.route.points);
+    if (points.length > 0) {
+      const bounds = new window.BMap.Bounds();
+      points.forEach((point) => {
+        bounds.extend(new window.BMap.Point(point.lng, point.lat));
+      });
+      baiduMapInstance.value.setViewport(bounds);
+    }
+  }
+};
+
 // 搜索
 const handleSearch = () => {
   pagination.current = 1;
@@ -346,74 +544,80 @@ const resetSearch = () => {
   handleSearch();
 };
 
-// 获取车辆列表
-const fetchVehicleList = () => {
-  loading.value = true;
-
-  // 构建查询参数
-  const params = {
-    plateNumber: searchForm.plateNumber,
-    type: searchForm.type ? parseInt(searchForm.type) : 0, // 转换为数字
-    status: searchForm.status ? parseInt(searchForm.status) : 0, // 转换为数字
-    routeId: searchForm.routeId,
-    routeName: searchForm.routeName,
-    limit: pagination.pageSize || 10,
-    skip: pagination.current || 1,
-  };
-
-  // 直接调用获取车辆列表接口
-  getVehicleList(params)
-    .then((vehicleRes) => {
-      if (vehicleRes.data.code === 0) {
-        // 处理返回的数据，确保处理 null 或不存在的情况
-        if (
-          vehicleRes.data.data &&
-          Array.isArray(vehicleRes.data.data) &&
-          vehicleRes.data.data.length > 0
-        ) {
-          // 更新数据，同时转换状态和类型为中文
-          vehicleList.value = vehicleRes.data.data.map((vehicle: any) => ({
-            ...vehicle,
-            // 保存原始值用于编辑
-            _originalStatus: vehicle.status,
-            _originalType: vehicle.type,
-            // 转换为展示用的中文
-            statusText: getVehicleStatusText(vehicle.status),
-            typeText: getVehicleTypeText(vehicle.type),
-          }));
-
-          // 使用获取到的数据长度作为总数
-          pagination.total = vehicleRes.data.data.length;
-        } else {
-          // 如果后端返回 null 或空数组，则将列表设为空数组
-          vehicleList.value = [];
-          pagination.total = 0;
-          message.info("没有查询到符合条件的车辆信息");
-        }
-      } else {
-        // 处理业务错误码
-        message.error(vehicleRes.data.message || "获取车辆列表失败");
-        vehicleList.value = [];
-        pagination.total = 0;
-      }
-    })
-    .catch((err) => {
-      console.error("获取数据失败:", err);
-      message.error("获取数据失败");
-      vehicleList.value = [];
-      pagination.total = 0;
-    })
-    .finally(() => {
-      // 无论成功失败都关闭加载状态
-      loading.value = false;
-    });
-};
-
 // 表格变化处理
 const handleTableChange = (pag: TablePaginationConfig) => {
   if (pag.current) pagination.current = pag.current;
   if (pag.pageSize) pagination.pageSize = pag.pageSize;
   fetchVehicleList();
+};
+
+// 获取车辆列表
+const fetchVehicleList = async () => {
+  loading.value = true;
+
+  try {
+    // 构建查询参数
+    const params = {
+      plateNumber: searchForm.plateNumber,
+      type: searchForm.type ? parseInt(searchForm.type) : 0, // 转换为数字
+      status: searchForm.status ? parseInt(searchForm.status) : 0, // 转换为数字
+      routeId: searchForm.routeId,
+      routeName: searchForm.routeName,
+      page: {
+        skip: pagination.current || 1,
+        limit: pagination.pageSize || 10,
+      },
+    };
+
+    // 并行请求列表数据和总数
+    const [vehicleRes, totalRes] = await Promise.all([
+      getVehicleList(params),
+      getTotalCount(),
+    ]);
+
+    if (vehicleRes.data.code === 0) {
+      // 处理返回的数据，确保处理 null 或不存在的情况
+      if (
+        vehicleRes.data.data &&
+        Array.isArray(vehicleRes.data.data) &&
+        vehicleRes.data.data.length > 0
+      ) {
+        // 更新数据，同时转换状态和类型为中文
+        vehicleList.value = vehicleRes.data.data.map((vehicle: any) => ({
+          ...vehicle,
+          // 保存原始值用于编辑
+          _originalStatus: vehicle.status,
+          _originalType: vehicle.type,
+          // 转换为展示用的中文
+          statusText: getVehicleStatusText(vehicle.status),
+          typeText: getVehicleTypeText(vehicle.type),
+        }));
+
+        // 使用总数接口返回的数据
+        if (totalRes.data.code === 0) {
+          pagination.total = totalRes.data.data || 0;
+        }
+      } else {
+        // 如果后端返回 null 或空数组，则将列表设为空数组
+        vehicleList.value = [];
+        pagination.total = 0;
+        message.info("没有查询到符合条件的车辆信息");
+      }
+    } else {
+      // 处理业务错误码
+      message.error(vehicleRes.data.message || "获取车辆列表失败");
+      vehicleList.value = [];
+      pagination.total = 0;
+    }
+  } catch (err) {
+    console.error("获取数据失败:", err);
+    message.error("获取数据失败");
+    vehicleList.value = [];
+    pagination.total = 0;
+  } finally {
+    // 无论成功失败都关闭加载状态
+    loading.value = false;
+  }
 };
 
 // 显示添加弹窗
@@ -425,11 +629,21 @@ const showAddModal = () => {
   vehicleForm.loadCapacity = 0;
   vehicleForm.status = "3";
   vehicleForm.routeId = "";
+  vehicleForm.lng = "";
+  vehicleForm.lat = "";
+
+  // 重置位置信息
+  vehicleLocation.lng = 0;
+  vehicleLocation.lat = 0;
+
+  // 设置默认地图中心
+  mapCenter.value = { lng: 116.404, lat: 39.915 };
+
   modalVisible.value = true;
 };
 
-// 显示编辑弹窗
-const showEditModal = (record: VehicleData) => {
+// 修改显示编辑弹窗函数
+const showEditModal = async (record: VehicleData) => {
   modalTitle.value = "编辑车辆";
   // 设置表单数据前，先进行类型和状态的转换
   const formData = {
@@ -440,10 +654,29 @@ const showEditModal = (record: VehicleData) => {
 
   // 将转换后的数据设置到表单中
   Object.assign(vehicleForm, formData);
+
+  // 解析位置信息
+  const location = parseLocationFromString(record.lng, record.lat);
+  vehicleLocation.lng = location.lng;
+  vehicleLocation.lat = location.lat;
+
+  // 如果有位置信息，设置地图中心
+  if (location.lng !== 0 && location.lat !== 0) {
+    mapCenter.value = { ...location };
+  } else if (
+    record.route &&
+    record.route.points &&
+    record.route.points.length > 0
+  ) {
+    // 如果没有车辆位置但有线路，使用线路的第一个点作为中心
+    const firstPoint = parseRoutePoints(record.route.points)[0];
+    mapCenter.value = firstPoint;
+  }
+
   modalVisible.value = true;
 };
 
-// 处理弹窗确认
+// 修改处理弹窗确认函数
 const handleModalOk = () => {
   vehicleFormRef.value.validate().then(() => {
     modalLoading.value = true;
@@ -454,7 +687,8 @@ const handleModalOk = () => {
       loadCapacity: vehicleForm.loadCapacity.toString(), // 转换为字符串
       routeId: vehicleForm.routeId || "", // 确保 routeId 不是 undefined
       remarks: vehicleForm.remarks || "", // 确保 remarks 不是 undefined
-      routeName: "", // 不再需要通过表单收集
+      lng: vehicleForm.lng || "", // 经度
+      lat: vehicleForm.lat || "", // 纬度
     };
 
     // 根据是新增还是编辑调用不同API
@@ -463,7 +697,7 @@ const handleModalOk = () => {
       : createvehicle(submitData);
 
     apiCall
-      .then((res: any) => {
+      .then(async (res: any) => {
         message.success(res.message || "操作成功");
         modalVisible.value = false;
         fetchVehicleList(); // 刷新列表
@@ -497,6 +731,52 @@ const handleDelete = (record: VehicleData) => {
     });
 };
 
+// 定位到车辆位置
+const locateToVehicle = () => {
+  const points: Point[] = [];
+
+  // 添加车辆位置
+  if (vehicleLocation.lng && vehicleLocation.lat) {
+    points.push({
+      lng: vehicleLocation.lng,
+      lat: vehicleLocation.lat,
+    });
+  }
+
+  // 添加线路点位
+  if (vehicleForm.route && vehicleForm.route.points) {
+    const routePoints = parseRoutePoints(vehicleForm.route.points);
+    points.push(...routePoints);
+  }
+
+  // 如果有点位，调整地图视图
+  if (points.length > 0) {
+    const bounds = new window.BMap.Bounds();
+    points.forEach((point) => {
+      bounds.extend(new window.BMap.Point(point.lng, point.lat));
+    });
+
+    if (baiduMapInstance.value) {
+      baiduMapInstance.value.setViewport(bounds, {
+        margins: [50, 50, 50, 50], // 设置边距
+        zoomFactor: -1, // 自动调整缩放级别
+      });
+    }
+  } else {
+    message.info("没有可显示的位置信息");
+  }
+};
+
+// 添加解析线路点位的函数
+const parseRoutePoints = (
+  points: Array<{ Type: string; Coordinates: [number, number] }>
+): Point[] => {
+  return points.map((point) => ({
+    lng: point.Coordinates[0],
+    lat: point.Coordinates[1],
+  }));
+};
+
 // 在组件初始化时获取数据
 onMounted(() => {
   fetchVehicleList();
@@ -506,6 +786,8 @@ onMounted(() => {
 <style scoped>
 .vehicle-container {
   padding: 24px;
+  background: #f0f2f5;
+  min-height: calc(100vh - 64px);
 }
 
 .search-card {
@@ -522,5 +804,54 @@ onMounted(() => {
 
 .danger-text {
   color: #ff4d4f;
+}
+
+.map-container {
+  height: 300px;
+  margin-bottom: 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+}
+
+.map {
+  height: 100%;
+  width: 100%;
+}
+
+.location-controls {
+  margin-top: 8px;
+  margin-bottom: 16px;
+}
+
+.locate-button-container {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+}
+
+.locate-button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: white;
+  border: 1px solid #d9d9d9;
+  border-radius: 2px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.locate-button:hover {
+  color: #1890ff;
+  border-color: #1890ff;
+}
+
+.locate-button:disabled {
+  color: rgba(0, 0, 0, 0.25);
+  background-color: #f5f5f5;
+  border-color: #d9d9d9;
+  cursor: not-allowed;
 }
 </style>

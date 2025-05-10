@@ -65,7 +65,9 @@
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
-          <a-tag :color="getStatusColor(record._originalStatus)">
+          <a-tag
+            :color="getStatusColor(record._originalStatus || record.status)"
+          >
             {{ record.statusText }}
           </a-tag>
         </template>
@@ -218,7 +220,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from "vue";
+import { ref, reactive, onMounted, h } from "vue";
 import { message } from "ant-design-vue";
 import { PlusOutlined, EnvironmentOutlined } from "@ant-design/icons-vue";
 import type { TablePaginationConfig } from "ant-design-vue";
@@ -237,6 +239,7 @@ import {
   deletevehicle,
   getVehicleTotalCount,
 } from "@/api/vehicle";
+import { Tag as ATag } from "ant-design-vue";
 
 interface Point {
   lng: number;
@@ -274,7 +277,10 @@ interface VehicleData {
   lat?: string;
   createTime?: string;
   updateTime?: string;
-  route?: RouteData; // 添加 route 字段
+  route?: RouteData;
+  statusText?: string;
+  typeText?: string;
+  _originalStatus?: string;
 }
 
 // 搜索表单数据
@@ -323,6 +329,13 @@ const columns = [
     title: "状态",
     dataIndex: "statusText",
     key: "status",
+    customRender: ({ record }: { record: VehicleData }) => {
+      return h(
+        ATag,
+        { color: getStatusColor(record._originalStatus || record.status) },
+        () => record.statusText || getVehicleStatusText(record.status)
+      );
+    },
   },
   {
     title: "备注",
@@ -574,7 +587,12 @@ const fetchVehicleList = async () => {
     ]);
 
     if (response.data.code === 0) {
-      vehicleList.value = response.data.data;
+      vehicleList.value = response.data.data.map((item: VehicleData) => ({
+        ...item,
+        statusText: getVehicleStatusText(item.status),
+        typeText: getVehicleTypeText(item.type),
+        _originalStatus: item.status, // 保存原始状态值用于颜色判断
+      }));
       // 使用总数接口返回的数据
       if (totalRes.data.code === 0) {
         pagination.total = totalRes.data.data || 0;

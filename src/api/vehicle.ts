@@ -86,3 +86,13 @@ export const deletevehicle = (params: string) => {
     },
   });
 };
+
+export const CompleteTransport = (params: string) => {
+  return axiosUtil.request({
+    url: "/vehicle/complete",
+    method: "get",
+    params: {
+      plateNumber: params,
+    },
+  });
+};

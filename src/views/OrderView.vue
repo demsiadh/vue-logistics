@@ -174,6 +174,26 @@
           <a-textarea v-model:value="orderForm.remark" :rows="2" />
         </a-form-item>
       </a-form>
+      <template #footer>
+        <a-space>
+          <a-button @click="handleModalCancel">取消</a-button>
+          <a-button
+            v-if="modalTitle === '编辑订单'"
+            type="primary"
+            @click="handleDispatch"
+            :loading="dispatchLoading"
+          >
+            手动调度
+          </a-button>
+          <a-button
+            type="primary"
+            @click="handleModalOk"
+            :loading="modalLoading"
+          >
+            确定
+          </a-button>
+        </a-space>
+      </template>
     </a-modal>
 
     <!-- 订单详情弹窗 -->
@@ -201,22 +221,26 @@
               {{ detailData.startAddress }}
             </a-descriptions-item>
             <a-descriptions-item label="发货网点">
-              {{ detailData.startOutlet?.name }}
+              {{ detailData.startOutlet?.name || "未分配" }}
             </a-descriptions-item>
             <a-descriptions-item label="收货地址">
               {{ detailData.endAddress }}
             </a-descriptions-item>
             <a-descriptions-item label="收货网点">
-              {{ detailData.endOutlet?.name }}
+              {{ detailData.endOutlet?.name || "未分配" }}
             </a-descriptions-item>
             <a-descriptions-item label="运输车牌号">
-              {{ detailData.transPortVehicle?.plateNumber }}
+              {{ detailData.transPortVehicle?.plateNumber || "未分配" }}
             </a-descriptions-item>
             <a-descriptions-item label="线路名称">
-              {{ detailData.route?.name }}
+              {{ detailData.route?.name || "未分配" }}
             </a-descriptions-item>
             <a-descriptions-item label="线路距离">
-              {{ detailData.route?.distance?.toFixed(2) }} 公里
+              {{
+                detailData.route?.distance
+                  ? `${detailData.route.distance.toFixed(2)} 公里`
+                  : "未分配"
+              }}
             </a-descriptions-item>
             <a-descriptions-item label="货物重量">
               {{ detailData.weight }} 吨
@@ -257,13 +281,14 @@
           >
             <!-- 起点标记 -->
             <bm-marker
+              v-if="detailData.startLng && detailData.startLat"
               :position="{
                 lng: parseFloat(detailData.startLng.toString()),
                 lat: parseFloat(detailData.startLat.toString()),
               }"
             >
               <bm-label
-                :content="detailData.startOutlet?.name"
+                :content="detailData.startOutlet?.name || '起点'"
                 :labelStyle="{
                   color: '#fff',
                   backgroundColor: '#1890ff',
@@ -275,13 +300,14 @@
             </bm-marker>
             <!-- 终点标记 -->
             <bm-marker
+              v-if="detailData.endLng && detailData.endLat"
               :position="{
                 lng: parseFloat(detailData.endLng.toString()),
                 lat: parseFloat(detailData.endLat.toString()),
               }"
             >
               <bm-label
-                :content="detailData.endOutlet?.name"
+                :content="detailData.endOutlet?.name || '终点'"
                 :labelStyle="{
                   color: '#fff',
                   backgroundColor: '#52c41a',
@@ -293,7 +319,10 @@
             </bm-marker>
             <!-- 车辆位置标记 -->
             <bm-marker
-              v-if="detailData.transPortVehicle"
+              v-if="
+                detailData.transPortVehicle?.lng &&
+                detailData.transPortVehicle?.lat
+              "
               :position="{
                 lng: parseFloat(detailData.transPortVehicle.lng),
                 lat: parseFloat(detailData.transPortVehicle.lat),
@@ -312,7 +341,9 @@
             </bm-marker>
             <!-- 路线 -->
             <bm-polyline
-              v-if="detailData.route"
+              v-if="
+                detailData.route?.points && detailData.route.points.length > 0
+              "
               :path="
                 detailData.route.points.map((point) => ({
                   lng: point.Coordinates[0],
@@ -345,6 +376,7 @@ import {
   deleteOrder,
   getOrderTotalCount,
   getOrderDetail,
+  dispatchOrder,
 } from "@/api/order";
 import { BaiduMap, BmMarker } from "vue-baidu-map-3x";
 
@@ -952,48 +984,66 @@ const handleDetailMapUnload = () => {
   }
 };
 
-// 处理地图加载完成
+// 修改处理地图加载完成函数
 const handleDetailMapReady = ({ BMap, map }: any) => {
   loadingDetailMap.value = false;
-  if (
-    detailData.startLng &&
-    detailData.startLat &&
-    detailData.endLng &&
-    detailData.endLat
-  ) {
-    try {
-      const startPoint = new BMap.Point(
+  const points = [];
+
+  // 添加起点
+  if (detailData.startLng && detailData.startLat) {
+    points.push(
+      new BMap.Point(
         parseFloat(detailData.startLng.toString()),
         parseFloat(detailData.startLat.toString())
-      );
-      const endPoint = new BMap.Point(
+      )
+    );
+  }
+
+  // 添加终点
+  if (detailData.endLng && detailData.endLat) {
+    points.push(
+      new BMap.Point(
         parseFloat(detailData.endLng.toString()),
         parseFloat(detailData.endLat.toString())
-      );
+      )
+    );
+  }
 
-      // 创建边界对象
+  // 添加车辆位置
+  if (detailData.transPortVehicle?.lng && detailData.transPortVehicle?.lat) {
+    points.push(
+      new BMap.Point(
+        parseFloat(detailData.transPortVehicle.lng),
+        parseFloat(detailData.transPortVehicle.lat)
+      )
+    );
+  }
+
+  // 如果有路线点，也添加到视图中
+  if (detailData.route?.points && detailData.route.points.length > 0) {
+    detailData.route.points.forEach((point) => {
+      points.push(new BMap.Point(point.Coordinates[0], point.Coordinates[1]));
+    });
+  }
+
+  // 只有当有点位时才设置视图
+  if (points.length > 0) {
+    try {
       const bounds = new BMap.Bounds();
-      bounds.extend(startPoint);
-      bounds.extend(endPoint);
-
-      // 如果有车辆位置，也加入到边界中
-      if (detailData.transPortVehicle) {
-        const vehiclePoint = new BMap.Point(
-          parseFloat(detailData.transPortVehicle.lng),
-          parseFloat(detailData.transPortVehicle.lat)
-        );
-        bounds.extend(vehiclePoint);
-      }
-
-      // 设置视图以包含所有点
-      map.setViewport(bounds);
+      points.forEach((point) => {
+        bounds.extend(point);
+      });
+      map.setViewport(bounds, {
+        margins: [50, 50, 50, 50], // 设置边距
+        zoomFactor: -1, // 自动调整缩放级别
+      });
     } catch (e) {
       console.error("Error setting map viewport:", e);
     }
   }
 };
 
-// 显示详情弹窗
+// 修改显示详情弹窗函数
 const showDetailModal = async (record: Order) => {
   try {
     loadingDetailMap.value = true;
@@ -1005,8 +1055,34 @@ const showDetailModal = async (record: Order) => {
       const startLat = parseFloat(detailData.startLat.toString());
       const endLng = parseFloat(detailData.endLng.toString());
       const endLat = parseFloat(detailData.endLat.toString());
-      detailMapCenter.lng = (startLng + endLng) / 2;
-      detailMapCenter.lat = (startLat + endLat) / 2;
+
+      // 计算所有点的中心位置
+      const points = [];
+      if (startLng && startLat) points.push({ lng: startLng, lat: startLat });
+      if (endLng && endLat) points.push({ lng: endLng, lat: endLat });
+      if (
+        detailData.transPortVehicle?.lng &&
+        detailData.transPortVehicle?.lat
+      ) {
+        points.push({
+          lng: parseFloat(detailData.transPortVehicle.lng),
+          lat: parseFloat(detailData.transPortVehicle.lat),
+        });
+      }
+
+      if (points.length > 0) {
+        const centerLng =
+          points.reduce((sum, p) => sum + p.lng, 0) / points.length;
+        const centerLat =
+          points.reduce((sum, p) => sum + p.lat, 0) / points.length;
+        detailMapCenter.lng = centerLng;
+        detailMapCenter.lat = centerLat;
+      } else {
+        // 如果没有有效点，使用默认中心点
+        detailMapCenter.lng = 116.404;
+        detailMapCenter.lat = 39.915;
+      }
+
       detailModalVisible.value = true;
     } else {
       message.error(res.data.message || "获取订单详情失败");
@@ -1029,17 +1105,30 @@ const handleDetailModalAfterClose = () => {
 const viewFullMap = () => {
   if (mapRef.value) {
     const map = mapRef.value.map;
-    const points = [
-      new BMap.Point(
-        parseFloat(detailData.startLng.toString()),
-        parseFloat(detailData.startLat.toString())
-      ),
-      new BMap.Point(
-        parseFloat(detailData.endLng.toString()),
-        parseFloat(detailData.endLat.toString())
-      ),
-    ];
-    if (detailData.transPortVehicle) {
+    const points = [];
+
+    // 添加起点
+    if (detailData.startLng && detailData.startLat) {
+      points.push(
+        new BMap.Point(
+          parseFloat(detailData.startLng.toString()),
+          parseFloat(detailData.startLat.toString())
+        )
+      );
+    }
+
+    // 添加终点
+    if (detailData.endLng && detailData.endLat) {
+      points.push(
+        new BMap.Point(
+          parseFloat(detailData.endLng.toString()),
+          parseFloat(detailData.endLat.toString())
+        )
+      );
+    }
+
+    // 添加车辆位置
+    if (detailData.transPortVehicle?.lng && detailData.transPortVehicle?.lat) {
       points.push(
         new BMap.Point(
           parseFloat(detailData.transPortVehicle.lng),
@@ -1047,7 +1136,34 @@ const viewFullMap = () => {
         )
       );
     }
-    map.setViewport(points);
+
+    // 只有当有点位时才设置视图
+    if (points.length > 0) {
+      map.setViewport(points);
+    }
+  }
+};
+
+// 在 script setup 部分添加
+const dispatchLoading = ref(false);
+
+// 处理手动调度
+const handleDispatch = async () => {
+  try {
+    dispatchLoading.value = true;
+    const res = await dispatchOrder(orderForm.orderId);
+    if (res.data.code === 0) {
+      message.success("调度成功");
+      modalVisible.value = false;
+      fetchOrderList();
+    } else {
+      message.error(res.data.message || "调度失败");
+    }
+  } catch (error) {
+    console.error("调度失败:", error);
+    message.error("调度失败，请稍后重试");
+  } finally {
+    dispatchLoading.value = false;
   }
 };
 

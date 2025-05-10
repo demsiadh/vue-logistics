@@ -93,3 +93,13 @@ export const getOrderDetail = (params: string) => {
     },
   });
 };
+
+export const dispatchOrder = (params: string) => {
+  return axiosUtil.request({
+    url: "/order/dispatch",
+    method: "put",
+    params: {
+      orderId: params,
+    },
+  });
+};

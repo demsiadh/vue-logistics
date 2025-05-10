@@ -82,6 +82,13 @@
             <a @click="showEditModal(record)">编辑</a>
             <a-divider type="vertical" />
             <a-popconfirm
+              title="确定要完成该车辆的运输任务吗？"
+              @confirm="handleCompleteTransport(record)"
+            >
+              <a>完成运输</a>
+            </a-popconfirm>
+            <a-divider type="vertical" />
+            <a-popconfirm
               title="确定要删除这辆车吗？"
               @confirm="handleDelete(record)"
             >
@@ -250,6 +257,7 @@ import {
   updatevehicle,
   deletevehicle,
   getVehicleTotalCount,
+  CompleteTransport,
 } from "@/api/vehicle";
 import { Tag as ATag } from "ant-design-vue";
 
@@ -367,7 +375,7 @@ const columns = [
     title: "操作",
     key: "action",
     fixed: "right",
-    width: 200,
+    width: 280,
   },
 ];
 
@@ -547,6 +555,9 @@ const parseLocationFromString = (lng?: string, lat?: string): Point => {
 // 地图加载完成
 const handleMapReady = (e: any) => {
   baiduMapInstance.value = e.map;
+  // 清除之前的覆盖物
+  baiduMapInstance.value.clearOverlays();
+
   // 如果已有线路数据，调整视图以显示整个线路
   if (
     vehicleForm.route &&
@@ -638,15 +649,21 @@ const fetchVehicleList = async () => {
 // 显示添加弹窗
 const showAddModal = () => {
   modalTitle.value = "添加车辆";
-  vehicleForm.id = "";
-  vehicleForm.plateNumber = "";
-  vehicleForm.type = "1";
-  vehicleForm.loadCapacity = 0;
-  vehicleForm.currentLoad = 0;
-  vehicleForm.status = "3";
-  vehicleForm.routeId = "";
-  vehicleForm.lng = "";
-  vehicleForm.lat = "";
+  // 重置所有表单数据
+  Object.assign(vehicleForm, {
+    id: "",
+    plateNumber: "",
+    type: "1",
+    loadCapacity: 0,
+    currentLoad: 0,
+    status: "3",
+    routeId: "",
+    routeName: "",
+    remarks: "",
+    lng: "",
+    lat: "",
+    route: undefined,
+  });
 
   // 重置位置信息
   vehicleLocation.lng = 0;
@@ -661,6 +678,28 @@ const showAddModal = () => {
 // 修改显示编辑弹窗函数
 const showEditModal = async (record: VehicleData) => {
   modalTitle.value = "编辑车辆";
+
+  // 先重置地图实例
+  if (baiduMapInstance.value) {
+    baiduMapInstance.value.clearOverlays();
+  }
+
+  // 重置所有表单数据
+  Object.assign(vehicleForm, {
+    id: "",
+    plateNumber: "",
+    type: "1",
+    loadCapacity: 0,
+    currentLoad: 0,
+    status: "3",
+    routeId: "",
+    routeName: "",
+    remarks: "",
+    lng: "",
+    lat: "",
+    route: undefined,
+  });
+
   // 设置表单数据前，先进行类型和状态的转换
   const formData = {
     ...record,
@@ -692,6 +731,40 @@ const showEditModal = async (record: VehicleData) => {
   modalVisible.value = true;
 };
 
+// 处理弹窗取消
+const handleModalCancel = () => {
+  // 清除地图覆盖物
+  if (baiduMapInstance.value) {
+    baiduMapInstance.value.clearOverlays();
+  }
+
+  // 重置所有表单数据
+  Object.assign(vehicleForm, {
+    id: "",
+    plateNumber: "",
+    type: "1",
+    loadCapacity: 0,
+    currentLoad: 0,
+    status: "3",
+    routeId: "",
+    routeName: "",
+    remarks: "",
+    lng: "",
+    lat: "",
+    route: undefined,
+  });
+
+  // 重置位置信息
+  vehicleLocation.lng = 0;
+  vehicleLocation.lat = 0;
+
+  // 重置地图中心
+  mapCenter.value = { lng: 116.404, lat: 39.915 };
+
+  vehicleFormRef.value?.resetFields();
+  modalVisible.value = false;
+};
+
 // 修改处理弹窗确认函数
 const handleModalOk = () => {
   vehicleFormRef.value.validate().then(() => {
@@ -717,6 +790,30 @@ const handleModalOk = () => {
       .then(async (res: any) => {
         message.success(res.message || "操作成功");
         modalVisible.value = false;
+
+        // 清除地图覆盖物
+        if (baiduMapInstance.value) {
+          baiduMapInstance.value.clearOverlays();
+        }
+
+        // 重置表单数据
+        Object.assign(vehicleForm, {
+          id: "",
+          plateNumber: "",
+          type: "1",
+          loadCapacity: 0,
+          currentLoad: 0,
+          status: "3",
+          routeId: "",
+          routeName: "",
+          remarks: "",
+          lng: "",
+          lat: "",
+          route: undefined,
+        });
+        // 重置位置信息
+        vehicleLocation.lng = 0;
+        vehicleLocation.lat = 0;
         fetchVehicleList(); // 刷新列表
       })
       .catch((err: any) => {
@@ -727,12 +824,6 @@ const handleModalOk = () => {
         modalLoading.value = false;
       });
   });
-};
-
-// 处理弹窗取消
-const handleModalCancel = () => {
-  vehicleFormRef.value?.resetFields();
-  modalVisible.value = false;
 };
 
 // 处理删除
@@ -792,6 +883,22 @@ const parseRoutePoints = (
     lng: point.Coordinates[0],
     lat: point.Coordinates[1],
   }));
+};
+
+// 添加完成运输的处理函数
+const handleCompleteTransport = async (record: VehicleData) => {
+  try {
+    const res = await CompleteTransport(record.plateNumber);
+    if (res.data.code === 0) {
+      message.success("运输任务已完成");
+      fetchVehicleList(); // 刷新列表
+    } else {
+      message.error(res.data.message || "操作失败");
+    }
+  } catch (error) {
+    console.error("完成运输失败:", error);
+    message.error("完成运输失败，请稍后重试");
+  }
 };
 
 // 在组件初始化时获取数据
@@ -870,5 +977,26 @@ onMounted(() => {
   background-color: #f5f5f5;
   border-color: #d9d9d9;
   cursor: not-allowed;
+}
+
+:deep(.ant-table-cell .ant-space) {
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+}
+
+:deep(.ant-table-cell .ant-space-item) {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0;
+}
+
+:deep(.ant-table-cell .ant-divider-vertical) {
+  margin: 0 8px;
+  height: 12px;
+}
+
+:deep(.ant-table-cell .ant-popconfirm) {
+  display: inline-block;
 }
 </style>

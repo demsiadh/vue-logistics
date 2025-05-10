@@ -407,7 +407,7 @@ const initWebSocket = () => {
     const token = localStorage.getItem("logistics_token") || "";
 
     // 在URL中添加令牌作为查询参数
-    const wsUrl = `ws://150.158.84.167:8080/api/llm/chat`;
+    const wsUrl = `ws://localhost:8080/api/llm/chat`;
     websocket = new WebSocket(wsUrl);
 
     // 连接建立时触发

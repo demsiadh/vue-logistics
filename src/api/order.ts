@@ -25,7 +25,6 @@ interface UpdateOrderDTO {
   orderId: string;
   customerName: string;
   phone: string;
-  address: string;
   status: number;
   remark: string;
 }
@@ -45,8 +44,13 @@ export const updateOrder = (params: UpdateOrderDTO) => {
 interface CreateOrderDTO {
   customerName: string;
   phone: string;
-  address: string;
-  status: number;
+  startAddress: string;
+  endAddress: string;
+  startLng: number;
+  startLat: number;
+  endLng: number;
+  endLat: number;
+  weight: number;
   remark: string;
 }
 
@@ -74,6 +78,16 @@ export const deleteOrder = (params: string) => {
   return axiosUtil.request({
     url: "/order/delete",
     method: "delete",
+    params: {
+      orderId: params,
+    },
+  });
+};
+
+export const getOrderDetail = (params: string) => {
+  return axiosUtil.request({
+    url: "/order/detail",
+    method: "get",
     params: {
       orderId: params,
     },

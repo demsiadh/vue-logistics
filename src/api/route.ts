@@ -26,6 +26,8 @@ interface UpdateRouteDTO {
   description: string; // 路线描述
   points: string; // 线路点位，采用GeoJSON格式
   distance: number; // 线路距离
+  startOutlet?: string; // 起始网点ID
+  endOutlet?: string; // 终点网点ID
 }
 
 export const updateRoute = (params: UpdateRouteDTO) => {
@@ -47,6 +49,8 @@ interface CreateRouteDTO {
   description: string; // 路线描述
   points: string; // 线路点位，采用GeoJSON格式
   distance: number; // 线路距离
+  startOutlet?: string; // 起始网点ID
+  endOutlet?: string; // 终点网点ID
 }
 
 export const createRoute = (params: CreateRouteDTO) => {

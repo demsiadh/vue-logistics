@@ -7,8 +7,10 @@ interface OrderListPostBody {
   status: number;
   startTime: string;
   endTime: string;
-  skip: number;
-  limit: number;
+  page: {
+    skip: number;
+    limit: number;
+  };
 }
 
 export const getOrderList = (params: OrderListPostBody) => {
@@ -60,11 +62,11 @@ export const createOrder = (params: CreateOrderDTO) => {
   });
 };
 
-export const getTotalCount = () => {
+export const getOrderTotalCount = (params: OrderListPostBody) => {
   return axiosUtil.request({
     url: "/order/total",
-    method: "get",
-    params: {},
+    method: "post",
+    data: params,
   });
 };
 

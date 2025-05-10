@@ -6,8 +6,10 @@ interface OutletListPostBody {
   status: number;
   province: string;
   city: string;
-  skip: number;
-  limit: number;
+  page: {
+    skip: number;
+    limit: number;
+  };
 }
 
 export const getOutletList = (params: OutletListPostBody) => {
@@ -67,11 +69,11 @@ export const createOutlet = (params: CreateOutletDTO) => {
   });
 };
 
-export const getTotalCount = () => {
+export const getOutletTotalCount = (params: OutletListPostBody) => {
   return axiosUtil.request({
     url: "/outlet/total",
-    method: "get",
-    params: {},
+    method: "post",
+    data: params,
   });
 };
 

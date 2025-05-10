@@ -474,9 +474,10 @@ import type { TablePaginationConfig } from "ant-design-vue";
 import dayjs, { Dayjs } from "dayjs";
 import {
   getOutletList,
-  updateOutlet,
   createOutlet,
+  updateOutlet,
   deleteOutlet,
+  getOutletTotalCount,
   getAllProvincesAndCities,
 } from "@/api/outlet";
 import { CHINA_PROVINCES } from "@/config/constants";
@@ -968,34 +969,41 @@ const resetSearch = () => {
   handleSearch();
 };
 
-// 获取网点列表
+// 获取营业网点列表数据
 const fetchOutletList = async () => {
   loading.value = true;
   try {
-    const response = await getOutletList({
-      name: searchForm.name,
+    const params = {
+      name: searchForm.name || "",
       status: searchForm.status ? Number(searchForm.status) : 0,
-      province: searchForm.province,
-      city: searchForm.city,
-      skip: pagination.current - 1,
-      limit: pagination.pageSize,
-    });
+      province: searchForm.province || "",
+      city: searchForm.city || "",
+      page: {
+        skip: pagination.current || 1,
+        limit: pagination.pageSize || 10,
+      },
+    };
+
+    // 并行请求列表数据和总数
+    const [response, totalRes] = await Promise.all([
+      getOutletList(params),
+      getOutletTotalCount(params),
+    ]);
 
     if (response.data.code === 0) {
-      if (response.data.data && Array.isArray(response.data.data)) {
-        outletList.value = response.data.data;
-        pagination.total = response.data.data.length;
-      } else {
-        outletList.value = [];
-        pagination.total = 0;
+      outletList.value = response.data.data;
+      // 使用总数接口返回的数据
+      if (totalRes.data.code === 0) {
+        pagination.total = totalRes.data.data || 0;
       }
     } else {
-      message.error("获取网点列表失败");
       outletList.value = [];
       pagination.total = 0;
+      message.error(response.data.message || "获取营业网点列表失败");
     }
   } catch (error) {
-    message.error("获取网点列表失败");
+    console.error("获取营业网点列表出错:", error);
+    message.error("获取营业网点列表失败，请稍后重试");
     outletList.value = [];
     pagination.total = 0;
   } finally {

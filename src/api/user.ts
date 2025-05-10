@@ -6,8 +6,10 @@ interface UserListPostBody {
   phone: string;
   email: string;
   status: number;
-  skip: number;
-  limit: number;
+  page: {
+    skip: number;
+    limit: number;
+  };
 }
 
 export const getUserList = (params: UserListPostBody) => {
@@ -74,11 +76,11 @@ export const createUser = (params: AddUserDTO) => {
   });
 };
 
-export const getTotalCount = () => {
+export const getTotalCount = (params: UserListPostBody) => {
   return axiosUtil.request({
     url: "/user/total",
-    method: "get",
-    params: {},
+    method: "post",
+    data: params,
   });
 };
 

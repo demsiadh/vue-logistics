@@ -139,6 +139,7 @@ import {
   createOrder,
   updateOrder,
   deleteOrder,
+  getOrderTotalCount,
 } from "@/api/order";
 
 // 设置dayjs的默认语言
@@ -245,7 +246,6 @@ const orderList = ref<Order[]>([]);
 const fetchOrderList = async () => {
   loading.value = true;
   try {
-    // 构建查询参数
     const params = {
       orderId: searchForm.orderId || "",
       phone: searchForm.phone || "",
@@ -260,26 +260,32 @@ const fetchOrderList = async () => {
             searchForm.dateRange[1].format("YYYY-MM-DD") + " 23:59:59 UTC"
           ).toISOString()
         : new Date().toISOString(),
-      skip: pagination.current || 1,
-      limit: pagination.pageSize || 10,
+      page: {
+        skip: pagination.current || 1,
+        limit: pagination.pageSize || 10,
+      },
     };
-    const res = await getOrderList(params);
-    if (res.data.code === 0) {
-      if (res.data.data && Array.isArray(res.data.data)) {
-        orderList.value = res.data.data;
-        // 使用获取到的数据长度作为总数
-        pagination.total = res.data.data.length;
-      } else {
-        orderList.value = [];
-        pagination.total = 0;
+
+    // 并行请求列表数据和总数
+    const [response, totalRes] = await Promise.all([
+      getOrderList(params),
+      getOrderTotalCount(params),
+    ]);
+
+    if (response.data.code === 0) {
+      orderList.value = response.data.data;
+      // 使用总数接口返回的数据
+      if (totalRes.data.code === 0) {
+        pagination.total = totalRes.data.data || 0;
       }
     } else {
-      message.error("获取订单列表失败");
       orderList.value = [];
       pagination.total = 0;
+      message.error(response.data.message || "获取订单列表失败");
     }
   } catch (error) {
-    message.error("获取订单列表失败");
+    console.error("获取订单列表出错:", error);
+    message.error("获取订单列表失败，请稍后重试");
     orderList.value = [];
     pagination.total = 0;
   } finally {

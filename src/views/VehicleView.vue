@@ -231,11 +231,11 @@ import {
   BmPolyline,
 } from "vue-baidu-map-3x";
 import {
-  getTotalCount,
   getVehicleList,
+  createvehicle,
   updatevehicle,
   deletevehicle,
-  createvehicle,
+  getVehicleTotalCount,
 } from "@/api/vehicle";
 
 interface Point {
@@ -554,15 +554,13 @@ const handleTableChange = (pag: TablePaginationConfig) => {
 // 获取车辆列表
 const fetchVehicleList = async () => {
   loading.value = true;
-
   try {
-    // 构建查询参数
     const params = {
-      plateNumber: searchForm.plateNumber,
-      type: searchForm.type ? parseInt(searchForm.type) : 0, // 转换为数字
-      status: searchForm.status ? parseInt(searchForm.status) : 0, // 转换为数字
-      routeId: searchForm.routeId,
-      routeName: searchForm.routeName,
+      plateNumber: searchForm.plateNumber || "",
+      type: searchForm.type ? Number(searchForm.type) : 0,
+      status: searchForm.status ? Number(searchForm.status) : 0,
+      routeId: searchForm.routeId || "",
+      routeName: searchForm.routeName || "",
       page: {
         skip: pagination.current || 1,
         limit: pagination.pageSize || 10,
@@ -570,52 +568,28 @@ const fetchVehicleList = async () => {
     };
 
     // 并行请求列表数据和总数
-    const [vehicleRes, totalRes] = await Promise.all([
+    const [response, totalRes] = await Promise.all([
       getVehicleList(params),
-      getTotalCount(),
+      getVehicleTotalCount(params),
     ]);
 
-    if (vehicleRes.data.code === 0) {
-      // 处理返回的数据，确保处理 null 或不存在的情况
-      if (
-        vehicleRes.data.data &&
-        Array.isArray(vehicleRes.data.data) &&
-        vehicleRes.data.data.length > 0
-      ) {
-        // 更新数据，同时转换状态和类型为中文
-        vehicleList.value = vehicleRes.data.data.map((vehicle: any) => ({
-          ...vehicle,
-          // 保存原始值用于编辑
-          _originalStatus: vehicle.status,
-          _originalType: vehicle.type,
-          // 转换为展示用的中文
-          statusText: getVehicleStatusText(vehicle.status),
-          typeText: getVehicleTypeText(vehicle.type),
-        }));
-
-        // 使用总数接口返回的数据
-        if (totalRes.data.code === 0) {
-          pagination.total = totalRes.data.data || 0;
-        }
-      } else {
-        // 如果后端返回 null 或空数组，则将列表设为空数组
-        vehicleList.value = [];
-        pagination.total = 0;
-        message.info("没有查询到符合条件的车辆信息");
+    if (response.data.code === 0) {
+      vehicleList.value = response.data.data;
+      // 使用总数接口返回的数据
+      if (totalRes.data.code === 0) {
+        pagination.total = totalRes.data.data || 0;
       }
     } else {
-      // 处理业务错误码
-      message.error(vehicleRes.data.message || "获取车辆列表失败");
       vehicleList.value = [];
       pagination.total = 0;
+      message.error(response.data.message || "获取车辆列表失败");
     }
-  } catch (err) {
-    console.error("获取数据失败:", err);
-    message.error("获取数据失败");
+  } catch (error) {
+    console.error("获取车辆列表出错:", error);
+    message.error("获取车辆列表失败，请稍后重试");
     vehicleList.value = [];
     pagination.total = 0;
   } finally {
-    // 无论成功失败都关闭加载状态
     loading.value = false;
   }
 };

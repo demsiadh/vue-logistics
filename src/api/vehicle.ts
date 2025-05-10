@@ -67,11 +67,11 @@ export const createvehicle = (params: CreatevehicleDTO) => {
   });
 };
 
-export const getTotalCount = () => {
+export const getVehicleTotalCount = (params: vehicleListPostBody) => {
   return axiosUtil.request({
     url: "/vehicle/total",
-    method: "get",
-    params: {},
+    method: "post",
+    data: params,
   });
 };
 

@@ -217,20 +217,28 @@ const fetchUserList = async () => {
       email: searchForm.email,
       phone: searchForm.phone,
       status: searchForm.status || USER_STATUS.ALL.VALUE,
-      skip: pagination.current,
-      limit: pagination.pageSize,
+      page: {
+        skip: pagination.current,
+        limit: pagination.pageSize,
+      },
     };
 
-    // 获取用户列表
-    const res = await getUserList(params);
+    // 并行请求列表数据和总数
+    const [res, totalRes] = await Promise.all([
+      getUserList(params),
+      getTotalCount(params),
+    ]);
+
     if (res.data.code === 0) {
       userList.value = res.data.data.map((item, index) => ({
         ...item,
         id: (pagination.current - 1) * pagination.pageSize + index + 1,
       }));
 
-      // 直接使用数据长度作为总数
-      pagination.total = res.data.data.length;
+      // 使用总数接口返回的数据
+      if (totalRes.data.code === 0) {
+        pagination.total = totalRes.data.data || 0;
+      }
     } else {
       userList.value = [];
       pagination.total = 0;

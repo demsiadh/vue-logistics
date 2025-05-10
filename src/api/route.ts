@@ -6,8 +6,10 @@ interface RouteListPostBody {
   name?: string; // 线路名称
   type?: number; // 线路类型
   status?: number; // 线路状态
-  skip: number; // 分页参数
-  limit: number; // 分页参数
+  page: {
+    skip: number;
+    limit: number;
+  };
 }
 
 export const getRouteList = (params: RouteListPostBody) => {
@@ -65,11 +67,11 @@ export const createRoute = (params: CreateRouteDTO) => {
   });
 };
 
-export const getRouteTotalCount = () => {
+export const getRouteTotalCount = (params: RouteListPostBody) => {
   return axiosUtil.request({
     url: "/route/total",
-    method: "get",
-    params: {},
+    method: "post",
+    data: params,
   });
 };
 

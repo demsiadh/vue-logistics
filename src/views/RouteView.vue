@@ -643,14 +643,24 @@ const fetchRouteList = async () => {
     const statusNum = searchForm.status
       ? mapStatusStringToNumber(searchForm.status)
       : 0;
-    const response = await getRouteList({
+
+    // 构建查询参数
+    const queryParams = {
       routeId: searchForm.routeId || "",
       name: searchForm.name || "",
       type: typeNum,
       status: statusNum,
-      skip: pagination.current || 1,
-      limit: pagination.pageSize || 10,
-    });
+      page: {
+        skip: pagination.current || 1,
+        limit: pagination.pageSize || 10,
+      },
+    };
+
+    // 并行请求列表数据和总数
+    const [response, totalRes] = await Promise.all([
+      getRouteList(queryParams),
+      getRouteTotalCount(queryParams),
+    ]);
 
     if (response.data.code === 0) {
       const routes = response.data.data;
@@ -669,8 +679,10 @@ const fetchRouteList = async () => {
           endOutlet: route.endOutlet || null, // 路线终点网点
         }));
 
-        // 使用数据长度作为总数
-        pagination.total = routes.length;
+        // 使用总数接口返回的数据
+        if (totalRes.data.code === 0) {
+          pagination.total = totalRes.data.data || 0;
+        }
       } else {
         routeList.value = [];
         pagination.total = 0;

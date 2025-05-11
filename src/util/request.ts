@@ -1,5 +1,5 @@
 import axios from "axios";
-import { Modal } from "ant-design-vue";
+import { message, Modal } from "ant-design-vue";
 
 interface ResponseData {
   code: number;
@@ -34,38 +34,18 @@ axiosUtil.interceptors.response.use(
     console.log(data);
     if (data.code === 70001) {
       if (!window.location.pathname.includes("/login")) {
-        Modal.error({
-          title: "操作失败",
-          content: "登录已过期，请登录",
-          okText: "去登录",
-          centered: true,
-          maskClosable: true,
-          onOk() {
-            window.location.href = "/login";
-          },
-        });
+        message.error("登录已过期，请登录");
+        window.location.href = "/login";
       }
     }
     if (data.code !== 0) {
-      Modal.error({
-        title: "操作失败",
-        content: data.message,
-        okText: "确认",
-        centered: true,
-        maskClosable: true,
-      });
+      message.error(data.message);
       return Promise.reject(data);
     }
     return response;
   },
   function (error) {
-    Modal.error({
-      title: "操作失败",
-      content: "服务器错误",
-      okText: "确认",
-      centered: true,
-      maskClosable: true,
-    });
+    message.error("服务器错误");
     return Promise.reject(error);
   }
 );

@@ -111,43 +111,41 @@
         </a-form-item>
         <template v-if="modalTitle === '新增订单'">
           <a-form-item label="发货地址" name="startAddress">
-            <div class="address-input-container">
-              <a-textarea
-                v-model:value="orderForm.startAddress"
-                :rows="2"
-                @change="handleStartAddressChange"
-                placeholder="请输入或在地图上选择发货地址"
-              />
-              <div class="map-container">
-                <baidu-map
-                  class="map"
-                  :center="startMapCenter"
-                  :zoom="15"
-                  @click="handleStartMapClick"
-                >
-                  <bm-marker :position="startMarkerPosition" />
-                </baidu-map>
-              </div>
+            <a-input
+              v-model:value="orderForm.startAddress"
+              placeholder="请输入或在地图上选择发货地址"
+              @change="handleStartAddressChange"
+            />
+          </a-form-item>
+          <a-form-item label="发货地址地图" name="startMap">
+            <div class="map-container">
+              <baidu-map
+                class="map"
+                :center="startMapCenter"
+                :zoom="15"
+                @click="handleStartMapClick"
+              >
+                <bm-marker :position="startMarkerPosition" />
+              </baidu-map>
             </div>
           </a-form-item>
           <a-form-item label="收货地址" name="endAddress">
-            <div class="address-input-container">
-              <a-textarea
-                v-model:value="orderForm.endAddress"
-                :rows="2"
-                @change="handleEndAddressChange"
-                placeholder="请输入或在地图上选择收货地址"
-              />
-              <div class="map-container">
-                <baidu-map
-                  class="map"
-                  :center="endMapCenter"
-                  :zoom="15"
-                  @click="handleEndMapClick"
-                >
-                  <bm-marker :position="endMarkerPosition" />
-                </baidu-map>
-              </div>
+            <a-input
+              v-model:value="orderForm.endAddress"
+              placeholder="请输入或在地图上选择收货地址"
+              @change="handleEndAddressChange"
+            />
+          </a-form-item>
+          <a-form-item label="收货地址地图" name="endMap">
+            <div class="map-container">
+              <baidu-map
+                class="map"
+                :center="endMapCenter"
+                :zoom="15"
+                @click="handleEndMapClick"
+              >
+                <bm-marker :position="endMarkerPosition" />
+              </baidu-map>
             </div>
           </a-form-item>
           <a-form-item label="货物重量" name="weight">
@@ -288,7 +286,7 @@
               }"
             >
               <bm-label
-                :content="detailData.startOutlet?.name || '起点'"
+                content="发货地址"
                 :labelStyle="{
                   color: '#fff',
                   backgroundColor: '#1890ff',
@@ -307,7 +305,7 @@
               }"
             >
               <bm-label
-                :content="detailData.endOutlet?.name || '终点'"
+                content="收货地址"
                 :labelStyle="{
                   color: '#fff',
                   backgroundColor: '#52c41a',
@@ -492,7 +490,7 @@ const columns = [
     title: "订单编号",
     dataIndex: "orderId",
     key: "orderId",
-    width: 140,
+    width: 150,
   },
   {
     title: "客户名称",
@@ -1209,7 +1207,7 @@ onMounted(() => {
 }
 
 .map-container {
-  width: 300px;
+  width: 100%;
   height: 200px;
   border: 1px solid #d9d9d9;
   border-radius: 2px;

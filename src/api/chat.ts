@@ -1,5 +1,26 @@
 import axiosUtil from "@/util/request";
 
+// 单条消息结构
+export interface ChatMessage {
+  role: "system" | "human" | "ai";
+  text: string;
+}
+
+// 对话详情结构
+export interface ChatDetail {
+  id: string;
+  username: string;
+  message: ChatMessage[];
+  title: string;
+}
+
+// 通用响应结构
+export interface ApiResponse<T = any> {
+  code: number;
+  message: string;
+  data: T;
+}
+
 export const getChatList = () => {
   return axiosUtil.request({
     url: "/llm/chatList",
@@ -8,9 +29,9 @@ export const getChatList = () => {
 };
 
 export const getChat = (chatId: string) => {
-  return axiosUtil.request({
+  return axiosUtil.request<ApiResponse<ChatDetail>>({
     url: "/llm/chat",
-    method: "post",
+    method: "get",
     params: {
       chatId: chatId,
     },

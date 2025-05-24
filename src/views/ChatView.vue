@@ -18,21 +18,45 @@
             @click="switchConversation(conv.id)"
           >
             <div class="conversation-header">
-              <span class="conversation-title">{{ conv.title }}</span>
-              <a-popconfirm
-                title="确定要删除此对话吗?"
-                @confirm="deleteConversation(conv.id)"
-                ok-text="是"
-                cancel-text="否"
-              >
-                <a-button type="text" danger size="small">
-                  <template #icon><DeleteOutlined /></template>
+              <div class="conversation-title-wrap">
+                <span class="conversation-title" v-if="editingId !== conv.id">
+                  {{ conv.title }}
+                </span>
+                <input
+                  v-else
+                  v-model="editingTitle"
+                  class="conversation-title-input"
+                  @blur="finishEdit(conv)"
+                  @keydown.enter="finishEdit(conv)"
+                  @click.stop
+                  style="width: 80%"
+                />
+              </div>
+              <div class="conversation-actions">
+                <a-button
+                  type="text"
+                  size="small"
+                  @click.stop="startEdit(conv)"
+                >
+                  <template #icon
+                    ><i
+                      class="anticon anticon-edit"
+                      style="font-size: 16px"
+                    />✏️</template
+                  >
                 </a-button>
-              </a-popconfirm>
+                <a-popconfirm
+                  title="确定要删除此对话吗?"
+                  @confirm="deleteConversation(conv.id)"
+                  ok-text="是"
+                  cancel-text="否"
+                >
+                  <a-button type="text" danger size="small">
+                    <template #icon><DeleteOutlined /></template>
+                  </a-button>
+                </a-popconfirm>
+              </div>
             </div>
-            <span class="conversation-time">{{
-              formatDate(conv.updatedAt)
-            }}</span>
           </div>
         </div>
       </div>
@@ -59,7 +83,9 @@
         <!-- 消息流始终渲染 -->
         <template v-else>
           <div
-            v-for="(message, index) in messages"
+            v-for="(message, index) in messages.filter(
+              (m) => m.role !== 'system'
+            )"
             :key="index"
             class="message-item"
             :class="message.role"
@@ -86,9 +112,6 @@
                 v-else
                 v-html="renderMarkdown(message.content)"
               ></div>
-              <div class="message-time">
-                {{ formatDate(message.timestamp) }}
-              </div>
             </div>
           </div>
         </template>
@@ -104,14 +127,16 @@
           <a-select-option value="hunyuan-turbos-latest"
             >Hunyuan Turbos</a-select-option
           >
-          <a-select-option value="deepseek-reasoner">DeepSeek</a-select-option>
+          <a-select-option value="deepseek-chat">DeepSeek V3</a-select-option>
+          <a-select-option value="deepseek-reasoner"
+            >DeepSeek R1</a-select-option
+          >
         </a-select>
         <a-textarea
           v-model:value="inputMessage"
           placeholder="请输入您的问题..."
-          :rows="3"
+          :rows="1"
           :disabled="loading || !currentConversationId"
-          @keydown.enter="handleEnterPress"
         />
         <a-button
           type="primary"
@@ -135,35 +160,28 @@ import {
   RobotOutlined,
 } from "@ant-design/icons-vue";
 import { marked } from "marked";
+import {
+  getChatList,
+  getChat,
+  deleteChat,
+  updateChatTitle,
+  createChat,
+  ChatDetail,
+} from "@/api/chat";
 
-// 消息和会话接口
-interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: number;
-  conversationId: string;
-}
-interface Conversation {
-  id: string;
-  title: string;
-  createdAt: number;
-  updatedAt: number;
-}
-
-// 聊天消息列表
-const messages = ref<ChatMessage[]>([]);
 // 对话列表
-const conversations = ref<Conversation[]>([]);
+const conversations = ref<{ id: string; title: string }[]>([]);
 // 当前选中的对话ID
 const currentConversationId = ref<string | null>(null);
 // 当前对话标题
 const currentConversationTitle = computed(() => {
-  const conversation = conversations.value.find(
+  const conv = conversations.value.find(
     (c) => c.id === currentConversationId.value
   );
-  return conversation ? conversation.title : "";
+  return conv ? conv.title : "";
 });
+// 消息列表
+const messages = ref<{ role: string; content: string }[]>([]);
 // 输入消息
 const inputMessage = ref("");
 // 选择的模型
@@ -177,6 +195,9 @@ const connectionStatus = reactive({
   color: "success" as "success" | "error" | "default",
   text: "正常",
 });
+// 新增响应式变量
+const editingId = ref<string | null>(null);
+const editingTitle = ref("");
 
 // 格式化日期
 const formatDate = (timestamp: number) => {
@@ -201,62 +222,64 @@ const renderMarkdown = (content: string) => {
     return content;
   }
 };
+
+// 加载对话列表
+const loadConversations = async () => {
+  const res = await getChatList();
+  conversations.value = res.data.data || [];
+};
+
+// 加载对话详情
+const loadChatDetail = async (chatId: string) => {
+  const res = await getChat(chatId);
+  const detail: ChatDetail = res.data.data;
+  currentConversationId.value = detail.id;
+  messages.value = (detail.message || []).map((msg) => ({
+    role:
+      msg.role === "human"
+        ? "user"
+        : msg.role === "ai"
+        ? "assistant"
+        : "system",
+    content: msg.text,
+  }));
+  await nextTick();
+  scrollToBottom();
+};
+
 // 创建新对话
-const createNewConversation = () => {
-  const now = Date.now();
-  const newConversation: Conversation = {
-    id: `conv_${now}`,
-    title: `新对话 ${new Date(now).toLocaleString("zh-CN", {
-      year: "numeric",
-      month: "numeric",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    })}`,
-    createdAt: now,
-    updatedAt: now,
-  };
-  conversations.value.unshift(newConversation);
-  switchConversation(newConversation.id);
+const createNewConversation = async () => {
+  const res = await createChat();
+  const newId = res.data.data;
+  await loadConversations();
+  await loadChatDetail(newId);
 };
+
 // 删除对话
-const deleteConversation = (conversationId: string) => {
-  conversations.value = conversations.value.filter(
-    (c) => c.id !== conversationId
-  );
-  // 如果删除的是当前会话，切换到第一个会话或创建新会话
-  if (currentConversationId.value === conversationId) {
-    if (conversations.value.length > 0) {
-      switchConversation(conversations.value[0].id);
-    } else {
-      currentConversationId.value = null;
-      messages.value = [];
-      createNewConversation();
-    }
+const deleteConversation = async (conversationId: string) => {
+  await deleteChat(conversationId);
+  await loadConversations();
+  if (conversations.value.length > 0) {
+    await loadChatDetail(conversations.value[0].id);
+  } else {
+    messages.value = [];
+    currentConversationId.value = null;
   }
 };
+
 // 切换对话
-const switchConversation = (conversationId: string) => {
+const switchConversation = async (conversationId: string) => {
   if (currentConversationId.value === conversationId) return;
-  currentConversationId.value = conversationId;
-  messages.value = [];
+  await loadChatDetail(conversationId);
 };
-// 更新对话的最后修改时间
-const updateConversationTime = (conversationId: string) => {
-  const conversation = conversations.value.find((c) => c.id === conversationId);
-  if (conversation) {
-    conversation.updatedAt = Date.now();
-  }
+
+// 修改对话标题（可绑定到UI重命名操作）
+const handleUpdateTitle = async (conversationId: string, newTitle: string) => {
+  await updateChatTitle(conversationId, newTitle);
+  await loadConversations();
 };
-// 处理回车按键
-const handleEnterPress = (e: KeyboardEvent) => {
-  if (!e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
-};
-// 发送消息（流式fetch）
+
+// 发送消息（流式fetch，保持原有逻辑）
 const sendMessage = async () => {
   if (
     !inputMessage.value.trim() ||
@@ -265,23 +288,15 @@ const sendMessage = async () => {
   )
     return;
   // 将用户消息添加到聊天记录
-  const userMessage: ChatMessage = {
-    id: `msg_${Date.now()}`,
+  messages.value.push({
     role: "user",
     content: inputMessage.value,
-    timestamp: Date.now(),
-    conversationId: currentConversationId.value,
-  };
-  messages.value.push(userMessage);
-  updateConversationTime(currentConversationId.value);
+  });
   loading.value = true;
   // AI消息流式
-  const aiMessage: ChatMessage = {
-    id: `msg_${Date.now()}_ai`,
+  const aiMessage = {
     role: "assistant",
     content: "AI正在思考...",
-    timestamp: Date.now(),
-    conversationId: currentConversationId.value,
   };
   messages.value.push(aiMessage);
   let aiMsg = "";
@@ -296,6 +311,7 @@ const sendMessage = async () => {
       body: JSON.stringify({
         model: selectedModel.value,
         message: inputMessage.value,
+        chatId: currentConversationId.value,
       }),
     });
     if (!response.body) throw new Error("无流式响应体");
@@ -308,7 +324,6 @@ const sendMessage = async () => {
       if (value) {
         const chunk = decoder.decode(value, { stream: true });
         aiMsg += chunk;
-        // 第一段内容到达时替换"AI正在思考..."
         aiMessage.content = aiMsg || "AI正在思考...";
         messages.value = [...messages.value];
         await nextTick();
@@ -323,6 +338,11 @@ const sendMessage = async () => {
     loading.value = false;
     inputMessage.value = "";
     scrollToBottom();
+    // 首次发消息后刷新对话标题
+    if (messages.value.length === 2 && currentConversationId.value) {
+      await loadConversations();
+      await loadChatDetail(currentConversationId.value);
+    }
   }
 };
 // 滚动到底部
@@ -337,103 +357,167 @@ const scrollToBottom = () => {
 watch(messages, () => {
   scrollToBottom();
 });
-// 组件挂载时加载对话列表
-onMounted(() => {
-  if (conversations.value.length === 0) {
-    createNewConversation();
-  } else {
-    switchConversation(conversations.value[0].id);
+// 组件挂载时加载对话列表和首个对话详情
+onMounted(async () => {
+  await loadConversations();
+  if (conversations.value.length > 0) {
+    await loadChatDetail(conversations.value[0].id);
   }
 });
+// 新增方法
+const startEdit = (conv: { id: string; title: string }) => {
+  editingId.value = conv.id;
+  editingTitle.value = conv.title;
+  nextTick(() => {
+    const input = document.querySelector(
+      ".conversation-title-input"
+    ) as HTMLInputElement;
+    input?.focus();
+    input?.select();
+  });
+};
+
+const finishEdit = async (conv: { id: string; title: string }) => {
+  if (editingTitle.value.trim() && editingTitle.value !== conv.title) {
+    await handleUpdateTitle(conv.id, editingTitle.value.trim());
+  }
+  editingId.value = null;
+};
 </script>
 
 <style scoped>
 /* 参考你的样式，略有调整，适配多会话布局 */
 .chat-container {
-  padding: 24px;
+  padding: 32px;
   max-width: 1600px;
   margin: 0 auto;
   height: calc(100vh - 80px);
   display: flex;
-  gap: 24px;
+  gap: 32px;
+  background: #f6f8fa;
 }
 .sidebar {
-  width: 250px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  width: 270px;
+  background: #f9fafb;
+  border-radius: 18px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  padding: 18px 0 18px 0;
 }
 .sidebar-header {
-  padding: 16px;
+  padding: 0 20px 18px 20px;
   border-bottom: 1px solid #f0f0f0;
+  background: none;
 }
 .conversations-list {
   flex: 1;
   overflow-y: auto;
-  padding: 8px;
+  padding: 12px 10px 0 10px;
 }
 .conversation-item {
-  padding: 12px;
-  border-radius: 6px;
-  margin-bottom: 8px;
+  padding: 16px 14px;
+  border-radius: 12px;
+  margin-bottom: 14px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, box-shadow 0.2s;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
 }
 .conversation-item:hover {
-  background-color: #f5f5f5;
+  background-color: #e6f7ff;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.08);
 }
 .conversation-item.active {
-  background-color: #e6f7ff;
+  background-color: #bae7ff;
+  box-shadow: 0 2px 12px rgba(24, 144, 255, 0.12);
 }
 .conversation-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 0;
+  min-height: 36px;
+}
+.conversation-title-wrap {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  flex: 1;
+  min-width: 0;
 }
 .conversation-title {
-  font-weight: 500;
+  font-weight: 700;
+  font-size: 1.08em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  width: 100%;
+  display: block;
+  color: #222;
 }
-.conversation-time {
-  font-size: 12px;
-  color: #999;
-  margin-top: 4px;
+.conversation-title-input {
+  font-size: 1em;
+  border: 1.5px solid #91d5ff;
+  border-radius: 8px;
+  padding: 4px 10px;
+  margin: 0;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  background: #f4faff;
+  outline: none;
+  transition: border 0.2s;
+}
+.conversation-title-input:focus {
+  border: 1.5px solid #1890ff;
+  background: #fff;
+}
+.conversation-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
 }
 .chat-card {
   flex: 1;
   height: 100%;
   display: flex;
   flex-direction: column;
+  border-radius: 18px;
+  box-shadow: 0 6px 32px rgba(0, 0, 0, 0.1);
+  background: #fff;
 }
 .chat-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 18px 24px 10px 24px;
+  border-radius: 18px 18px 0 0;
+  background: none;
 }
 .chat-header .title {
   font-weight: bold;
-  font-size: 16px;
+  font-size: 20px;
+  color: #222;
 }
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 .chat-content {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 8px;
-  margin-bottom: 16px;
+  padding: 32px 24px 24px 24px;
+  margin-bottom: 0;
   border-top: 1px solid #f0f0f0;
   border-bottom: 1px solid #f0f0f0;
-  position: relative; /* 让 loading-indicator-floating 绝对定位于此 */
+  position: relative;
+  background: #f8fafc;
 }
 .empty-chat {
   display: flex;
@@ -443,54 +527,114 @@ onMounted(() => {
 }
 .message-item {
   display: flex;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 .message-item.user {
   flex-direction: row-reverse;
 }
 .avatar {
-  margin: 0 12px;
+  margin: 0 18px;
 }
 .message-content {
   max-width: 85%;
 }
 .message-text {
-  padding: 10px 16px;
-  border-radius: 8px;
+  padding: 16px 24px;
+  border-radius: 16px;
   word-break: break-word;
   white-space: pre-wrap;
-  line-height: 1.5;
+  line-height: 1.7;
+  font-size: 1.08em;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 .user .message-text {
   background-color: #e6f7ff;
-  color: #000;
+  color: #222;
   border-top-right-radius: 0;
 }
 .assistant .message-text {
   background-color: #f0f0f0;
-  color: #000;
+  color: #222;
   border-top-left-radius: 0;
-}
-.message-time {
-  font-size: 12px;
-  color: #999;
-  margin-top: 4px;
-  text-align: right;
-}
-.user .message-time {
-  text-align: right;
-}
-.assistant .message-time {
-  text-align: left;
+  width: 1000px;
+  min-width: 1000px;
+  max-width: 1000px;
+  box-sizing: border-box;
 }
 .chat-input {
   margin-top: auto;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  padding: 24px 24px 24px 24px;
+  background: #fff;
+  border-radius: 0 0 18px 18px;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.03);
+  gap: 18px;
+}
+:deep(.ant-select-selector) {
+  border-radius: 8px !important;
+  background: #f4faff !important;
+  border: 1.5px solid #91d5ff !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  font-size: 1.08em !important;
+  display: flex !important;
+  align-items: center !important;
+}
+:deep(.ant-select-selection-item) {
+  line-height: 48px !important;
+}
+:deep(.ant-select-arrow) {
+  color: #1890ff !important;
+}
+:deep(.ant-input) {
+  border-radius: 8px !important;
+  background: #f4faff !important;
+  border: 1.5px solid #91d5ff !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  max-height: 48px !important;
+  font-size: 1.08em !important;
+  padding: 8px 14px !important;
+  line-height: 32px !important;
+  resize: none !important;
+  box-shadow: none !important;
+  overflow-y: hidden !important;
+  /* 隐藏输入框右侧上下箭头 */
+  scrollbar-width: none !important;
+}
+:deep(.ant-input::-webkit-scrollbar) {
+  display: none !important;
+}
+:deep(.ant-input:focus) {
+  border: 1.5px solid #1890ff !important;
+  background: #fff !important;
+  overflow-y: auto !important;
 }
 .send-button {
-  margin-left: 16px;
-  height: 80px;
+  margin-left: 0;
+  height: 48px;
+  min-width: 100px;
+  border-radius: 24px;
+  font-size: 1.12em;
+  font-weight: 600;
+  background: linear-gradient(90deg, #1890ff 0%, #40a9ff 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.1);
+  border: none;
+  transition: background 0.2s, box-shadow 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.send-button:disabled {
+  background: #d6e4ff;
+  color: #888;
+  box-shadow: none;
+}
+.send-button:hover:not(:disabled) {
+  background: linear-gradient(90deg, #40a9ff 0%, #1890ff 100%);
+  box-shadow: 0 4px 16px rgba(24, 144, 255, 0.18);
 }
 .loading-indicator-floating {
   position: absolute;
@@ -512,8 +656,9 @@ onMounted(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 12px;
+  padding: 0;
   overflow: hidden;
+  background: none;
 }
 /* Markdown styling */
 .markdown-content :deep(a) {

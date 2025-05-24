@@ -110,7 +110,7 @@ router.beforeEach(async (to, from, next) => {
     return;
   }
 
-  if (isLoggedIn && isLoginPage) {
+  if (isLoggedIn && isLoginPage && from.path !== "/login") {
     message.error("您已登录，请勿重复登录！");
     next("/");
     return;

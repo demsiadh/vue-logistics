@@ -19,6 +19,10 @@ const axiosUtil = axios.create({
 axiosUtil.interceptors.request.use(
   function (config) {
     // 在发送请求之前做些什么
+    // 每次请求都动态设置最新 token
+    config.headers = config.headers || {};
+    config.headers["logistics_token"] =
+      localStorage.getItem("logistics_token") || "";
     return config;
   },
   function (error) {

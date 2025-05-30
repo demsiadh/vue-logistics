@@ -88,64 +88,114 @@
             )"
             :key="index"
             class="message-item"
-            :class="message.role"
+            :class="[
+              message.role,
+              { 'is-generic': message.role === 'generic' },
+            ]"
           >
             <div class="avatar">
               <a-avatar
                 :style="{
                   backgroundColor:
-                    message.role === 'user' ? '#1890ff' : '#52c41a',
+                    message.role === 'assistant' ? '#52c41a' : '#1890ff',
                 }"
               >
                 <template #icon>
-                  <UserOutlined v-if="message.role === 'user'" />
-                  <RobotOutlined v-else />
+                  <RobotOutlined v-if="message.role === 'assistant'" />
+                  <UserOutlined v-else />
                 </template>
               </a-avatar>
             </div>
             <div class="message-content">
-              <div class="message-text" v-if="message.role === 'user'">
-                {{ message.content }}
+              <div
+                v-if="message.role === 'generic'"
+                class="message-text"
+                :class="{ 'has-content': showGenericMap[index] }"
+              >
+                <div
+                  class="generic-trigger"
+                  @click="showGenericMap[index] = !showGenericMap[index]"
+                >
+                  <InfoCircleOutlined style="margin-right: 6px" />
+                  <span>
+                    {{
+                      showGenericMap[index]
+                        ? "收起相关知识"
+                        : "点击查看相关知识"
+                    }}
+                  </span>
+                </div>
+                <div
+                  v-show="showGenericMap[index]"
+                  class="generic-content markdown-content"
+                  v-html="renderMarkdown(message.text)"
+                ></div>
+              </div>
+              <div v-else-if="message.role === 'user'" class="message-text">
+                {{ message.text }}
               </div>
               <div
-                class="message-text markdown-content"
                 v-else
-                v-html="renderMarkdown(message.content)"
+                class="message-text markdown-content"
+                v-html="renderMarkdown(message.text)"
               ></div>
             </div>
           </div>
         </template>
       </div>
       <div class="chat-input">
-        <a-select
-          v-model:value="selectedModel"
-          style="width: 180px; margin-right: 16px"
-          placeholder="选择模型"
-          :dropdownAlign="{ points: ['bl', 'tl'], offset: [0, 4] }"
-        >
-          <a-select-option value="hunyuan-lite">Hunyuan Lite</a-select-option>
-          <a-select-option value="hunyuan-turbos-latest"
-            >Hunyuan Turbos</a-select-option
+        <div class="chat-options">
+          <div class="left-options">
+            <a-select
+              v-model:value="selectedModel"
+              style="width: 160px"
+              placeholder="选择模型"
+              size="middle"
+            >
+              <a-select-option value="hunyuan-lite">
+                Hunyuan Lite
+              </a-select-option>
+              <a-select-option value="hunyuan-turbos-latest">
+                Hunyuan Turbos
+              </a-select-option>
+              <a-select-option value="deepseek-chat">
+                DeepSeek V3
+              </a-select-option>
+              <a-select-option value="deepseek-reasoner">
+                DeepSeek R1
+              </a-select-option>
+            </a-select>
+            <a-button
+              :type="isRagEnabled ? 'primary' : 'default'"
+              @click="isRagEnabled = !isRagEnabled"
+              class="rag-button"
+              size="middle"
+            >
+              检索增强
+            </a-button>
+          </div>
+        </div>
+        <div class="input-area">
+          <a-textarea
+            v-model:value="inputMessage"
+            placeholder="请输入您的问题..."
+            :rows="1"
+            :disabled="loading || !currentConversationId"
+            class="chat-textarea"
+            :class="{ 'is-disabled': loading || !currentConversationId }"
+          />
+          <a-button
+            type="primary"
+            :disabled="
+              !inputMessage.trim() || loading || !currentConversationId
+            "
+            @click="sendMessage"
+            class="send-button"
+            size="large"
           >
-          <a-select-option value="deepseek-chat">DeepSeek V3</a-select-option>
-          <a-select-option value="deepseek-reasoner"
-            >DeepSeek R1</a-select-option
-          >
-        </a-select>
-        <a-textarea
-          v-model:value="inputMessage"
-          placeholder="请输入您的问题..."
-          :rows="1"
-          :disabled="loading || !currentConversationId"
-        />
-        <a-button
-          type="primary"
-          :disabled="!inputMessage.trim() || loading || !currentConversationId"
-          @click="sendMessage"
-          class="send-button"
-        >
-          发送
-        </a-button>
+            发送
+          </a-button>
+        </div>
       </div>
     </a-card>
   </div>
@@ -158,6 +208,7 @@ import {
   DeleteOutlined,
   UserOutlined,
   RobotOutlined,
+  InfoCircleOutlined,
 } from "@ant-design/icons-vue";
 import { marked } from "marked";
 import {
@@ -168,6 +219,12 @@ import {
   createChat,
   ChatDetail,
 } from "@/api/chat";
+
+// 在script部分添加类型定义
+interface Message {
+  role: string;
+  text: string;
+}
 
 // 对话列表
 const conversations = ref<{ id: string; title: string }[]>([]);
@@ -181,7 +238,7 @@ const currentConversationTitle = computed(() => {
   return conv ? conv.title : "";
 });
 // 消息列表
-const messages = ref<{ role: string; content: string }[]>([]);
+const messages = ref<Message[]>([]);
 // 输入消息
 const inputMessage = ref("");
 // 选择的模型
@@ -198,6 +255,10 @@ const connectionStatus = reactive({
 // 新增响应式变量
 const editingId = ref<string | null>(null);
 const editingTitle = ref("");
+// 新增isRagEnabled变量
+const isRagEnabled = ref(false);
+// 新增showGenericMap变量
+const showGenericMap = ref<{ [key: string]: boolean }>({});
 
 // 格式化日期
 const formatDate = (timestamp: number) => {
@@ -240,8 +301,8 @@ const loadChatDetail = async (chatId: string) => {
         ? "user"
         : msg.role === "ai"
         ? "assistant"
-        : "system",
-    content: msg.text,
+        : msg.role,
+    text: msg.text,
   }));
   await nextTick();
   scrollToBottom();
@@ -290,13 +351,13 @@ const sendMessage = async () => {
   // 将用户消息添加到聊天记录
   messages.value.push({
     role: "user",
-    content: inputMessage.value,
+    text: inputMessage.value,
   });
   loading.value = true;
   // AI消息流式
   const aiMessage = {
     role: "assistant",
-    content: "AI正在思考...",
+    text: "AI正在思考...",
   };
   messages.value.push(aiMessage);
   let aiMsg = "";
@@ -312,6 +373,7 @@ const sendMessage = async () => {
         model: selectedModel.value,
         message: inputMessage.value,
         chatId: currentConversationId.value,
+        isRag: isRagEnabled.value,
       }),
     });
     if (!response.body) throw new Error("无流式响应体");
@@ -324,13 +386,13 @@ const sendMessage = async () => {
       if (value) {
         const chunk = decoder.decode(value, { stream: true });
         aiMsg += chunk;
-        aiMessage.content = aiMsg || "AI正在思考...";
+        aiMessage.text = aiMsg || "AI正在思考...";
         messages.value = [...messages.value];
         await nextTick();
         scrollToBottom();
       }
     }
-    aiMessage.content = aiMsg || "AI正在思考...";
+    aiMessage.text = aiMsg || "AI正在思考...";
     scrollToBottom();
   } catch (err: any) {
     antdMessage.error("请求失败：" + (err?.message || err));
@@ -512,12 +574,102 @@ const finishEdit = async (conv: { id: string; title: string }) => {
 .chat-content {
   flex: 1;
   overflow-y: auto;
-  padding: 32px 24px 24px 24px;
-  margin-bottom: 0;
-  border-top: 1px solid #f0f0f0;
-  border-bottom: 1px solid #f0f0f0;
-  position: relative;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
   background: #f8fafc;
+}
+.chat-input {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 24px 16px;
+  background: #fff;
+  border-radius: 0 0 18px 18px;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.03);
+  border-top: 1px solid #f0f0f0;
+}
+.chat-options {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.left-options {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.input-area {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.rag-button {
+  border-radius: 4px;
+  transition: all 0.3s;
+  font-size: 14px;
+  height: 32px;
+  padding: 0 12px;
+}
+.rag-button:hover {
+  opacity: 0.85;
+}
+:deep(.ant-select-selector) {
+  border-radius: 4px !important;
+  height: 32px !important;
+  border-color: #d9d9d9 !important;
+}
+:deep(.ant-select-selection-item) {
+  line-height: 30px !important;
+  font-size: 14px;
+}
+.chat-textarea {
+  flex: 1;
+  border-radius: 6px !important;
+  resize: none !important;
+  transition: all 0.3s !important;
+  font-size: 14px !important;
+  padding: 8px 12px !important;
+  min-height: 40px !important;
+  background: #fff !important;
+  border: 1px solid #d9d9d9 !important;
+}
+.chat-textarea:hover {
+  border-color: #40a9ff !important;
+}
+.chat-textarea:focus {
+  border-color: #1890ff !important;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+}
+.chat-textarea.is-disabled {
+  background: #f5f5f5 !important;
+  border-color: #d9d9d9 !important;
+  cursor: not-allowed;
+}
+.send-button {
+  margin-left: 0;
+  height: 40px;
+  min-width: 88px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 0 16px;
+  background: #1890ff;
+  border: none;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.send-button:not(:disabled):hover {
+  background: #40a9ff;
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.25);
+}
+.send-button:disabled {
+  background: #f5f5f5;
+  border: 1px solid #d9d9d9;
+  color: #bfbfbf;
+  box-shadow: none;
 }
 .empty-chat {
   display: flex;
@@ -526,6 +678,7 @@ const finishEdit = async (conv: { id: string; title: string }) => {
   height: 100%;
 }
 .message-item {
+  padding: 0 24px;
   display: flex;
   margin-bottom: 24px;
 }
@@ -560,81 +713,6 @@ const finishEdit = async (conv: { id: string; title: string }) => {
   min-width: 1000px;
   max-width: 1000px;
   box-sizing: border-box;
-}
-.chat-input {
-  margin-top: auto;
-  display: flex;
-  align-items: center;
-  padding: 24px 24px 24px 24px;
-  background: #fff;
-  border-radius: 0 0 18px 18px;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.03);
-  gap: 18px;
-}
-:deep(.ant-select-selector) {
-  border-radius: 8px !important;
-  background: #f4faff !important;
-  border: 1.5px solid #91d5ff !important;
-  min-height: 48px !important;
-  height: 48px !important;
-  font-size: 1.08em !important;
-  display: flex !important;
-  align-items: center !important;
-}
-:deep(.ant-select-selection-item) {
-  line-height: 48px !important;
-}
-:deep(.ant-select-arrow) {
-  color: #1890ff !important;
-}
-:deep(.ant-input) {
-  border-radius: 8px !important;
-  background: #f4faff !important;
-  border: 1.5px solid #91d5ff !important;
-  min-height: 48px !important;
-  height: 48px !important;
-  max-height: 48px !important;
-  font-size: 1.08em !important;
-  padding: 8px 14px !important;
-  line-height: 32px !important;
-  resize: none !important;
-  box-shadow: none !important;
-  overflow-y: hidden !important;
-  /* 隐藏输入框右侧上下箭头 */
-  scrollbar-width: none !important;
-}
-:deep(.ant-input::-webkit-scrollbar) {
-  display: none !important;
-}
-:deep(.ant-input:focus) {
-  border: 1.5px solid #1890ff !important;
-  background: #fff !important;
-  overflow-y: auto !important;
-}
-.send-button {
-  margin-left: 0;
-  height: 48px;
-  min-width: 100px;
-  border-radius: 24px;
-  font-size: 1.12em;
-  font-weight: 600;
-  background: linear-gradient(90deg, #1890ff 0%, #40a9ff 100%);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.1);
-  border: none;
-  transition: background 0.2s, box-shadow 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.send-button:disabled {
-  background: #d6e4ff;
-  color: #888;
-  box-shadow: none;
-}
-.send-button:hover:not(:disabled) {
-  background: linear-gradient(90deg, #40a9ff 0%, #1890ff 100%);
-  box-shadow: 0 4px 16px rgba(24, 144, 255, 0.18);
 }
 .loading-indicator-floating {
   position: absolute;
@@ -712,5 +790,62 @@ const finishEdit = async (conv: { id: string; title: string }) => {
   border: none;
   border-top: 1px solid #eee;
   margin: 16px 0;
+}
+.generic-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.generic-header:hover {
+  background: #e8e8e8;
+}
+.generic-title {
+  display: flex;
+  align-items: center;
+  color: #666;
+  font-size: 13px;
+}
+.generic-content {
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+.message-item.generic {
+  margin-bottom: 12px;
+}
+.message-item.generic .message-content {
+  flex: 1;
+  max-width: 100%;
+}
+.message-item.is-generic {
+  flex-direction: row-reverse;
+}
+.message-item.is-generic .message-text {
+  background-color: #e6f7ff;
+  border-top-right-radius: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.generic-trigger {
+  padding: 12px 16px;
+  color: #1890ff;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+}
+.generic-trigger:hover {
+  background-color: #bae7ff;
+}
+.message-text.has-content .generic-trigger {
+  background-color: #bae7ff;
 }
 </style>

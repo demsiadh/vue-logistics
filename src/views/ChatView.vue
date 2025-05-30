@@ -148,7 +148,7 @@
           <div class="left-options">
             <a-select
               v-model:value="selectedModel"
-              style="width: 160px; margin-right: 8px"
+              style="width: 160px"
               placeholder="选择模型"
               size="middle"
             >
@@ -169,10 +169,17 @@
               :type="isRagEnabled ? 'primary' : 'default'"
               @click="isRagEnabled = !isRagEnabled"
               class="rag-button"
-              style="margin-right: 8px"
               size="middle"
             >
               检索增强
+            </a-button>
+            <a-button
+              :type="isAgent ? 'primary' : 'default'"
+              @click="isAgent = !isAgent"
+              class="agent-button"
+              size="middle"
+            >
+              Agent
             </a-button>
             <a-button
               :type="showRepository ? 'primary' : 'default'"
@@ -234,31 +241,7 @@
             :customRequest="handleFileUpload"
             :showUploadList="false"
             :maxCount="1"
-            accept=".txt,.doc,.docx,.pdf"
-            :beforeUpload="
-              (file) => {
-                // 16KB = 16 * 1024 bytes
-                const isLt16KB = file.size / 1024 <= 16;
-                if (!isLt16KB) {
-                  antdMessage.error('仅支持16KB以下的文件！');
-                  return false;
-                }
-
-                // 检查文件类型
-                const allowedTypes = [
-                  'text/plain',
-                  'application/msword',
-                  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                  'application/pdf',
-                ];
-                if (!allowedTypes.includes(file.type)) {
-                  antdMessage.error('仅支持 txt、doc、docx、pdf 格式的文件！');
-                  return false;
-                }
-
-                return true;
-              }
-            "
+            accept=".txt,.md,.json,.yaml,.yml"
           >
             <a-button type="primary" :loading="fileLoading">
               <upload-outlined />
@@ -383,6 +366,8 @@ const fileList = ref<FileInfo[]>([]);
 const fileLoading = ref(false);
 // 新增searchFileName变量
 const searchFileName = ref("");
+// 新增isAgent变量
+const isAgent = ref(false);
 
 // 格式化日期
 const formatDate = (timestamp: number) => {
@@ -472,13 +457,11 @@ const sendMessage = async () => {
     !currentConversationId.value
   )
     return;
-  // 将用户消息添加到聊天记录
   messages.value.push({
     role: "user",
     text: inputMessage.value,
   });
   loading.value = true;
-  // AI消息流式
   const aiMessage = {
     role: "assistant",
     text: "AI正在思考...",
@@ -498,9 +481,10 @@ const sendMessage = async () => {
         message: inputMessage.value,
         chatId: currentConversationId.value,
         isRag: isRagEnabled.value,
+        isAgent: isAgent.value,
       }),
     });
-    if (!response.body) throw new Error("无流式响应体");
+    if (!response.body) throw new Error();
     const reader = response.body.getReader();
     const decoder = new TextDecoder("utf-8");
     let done = false;
@@ -518,13 +502,12 @@ const sendMessage = async () => {
     }
     aiMessage.text = aiMsg || "AI正在思考...";
     scrollToBottom();
-  } catch (err: any) {
-    antdMessage.error("请求失败：" + (err?.message || err));
+  } catch (err) {
+    console.error(err);
   } finally {
     loading.value = false;
     inputMessage.value = "";
     scrollToBottom();
-    // 首次发消息后刷新对话标题
     if (messages.value.length === 2 && currentConversationId.value) {
       await loadConversations();
       await loadChatDetail(currentConversationId.value);
@@ -582,7 +565,6 @@ const loadFileList = async () => {
     });
     fileList.value = res.data.data || [];
   } catch (error) {
-    antdMessage.error("获取知识库列表失败");
     fileList.value = [];
   } finally {
     fileLoading.value = false;
@@ -597,28 +579,17 @@ const handleSearch = () => {
 // 处理文件上传
 const handleFileUpload = async (options: any) => {
   const { file, onSuccess, onError } = options;
-
-  // 验证文件是否为空
-  if (!file || file.size === 0) {
-    antdMessage.error("文件不能为空！");
-    onError?.(new Error("文件不能为空！"));
-    return;
-  }
-
   try {
     fileLoading.value = true;
     const res = await uploadFile(file, BusinessType.AIRepository);
-
     if (res.data.code === 0) {
-      antdMessage.success("上传成功");
       await loadFileList();
       onSuccess?.(res);
     } else {
-      throw new Error(res.data.message || "上传失败");
+      throw new Error(res.data.message);
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error("文件上传错误:", error);
-    antdMessage.error(error.message || "上传失败，请检查文件格式和大小");
     onError?.(error);
   } finally {
     fileLoading.value = false;
@@ -629,31 +600,26 @@ const handleFileUpload = async (options: any) => {
 const handleFileDelete = async (fileId: string) => {
   try {
     await deleteFile(fileId);
-    antdMessage.success("删除成功");
     await loadFileList();
   } catch (error) {
-    antdMessage.error("删除失败");
+    console.error("文件删除错误:", error);
   }
 };
 
 // 处理文件下载
 const handleFileDownload = async (fileId: string) => {
   try {
-    // 从fileList中找到对应的文件信息
     const fileInfo = fileList.value.find((file) => file.id === fileId);
     if (!fileInfo || !fileInfo.fileData) {
-      throw new Error("文件不存在或数据为空");
+      throw new Error();
     }
-
-    // 使用文件信息中的Base64数据直接下载
     await downloadFileFromBase64(
       fileInfo.fileData,
       fileInfo.fileName,
       fileInfo.contentType
     );
-    antdMessage.success("下载成功");
   } catch (error) {
-    antdMessage.error("下载失败");
+    console.error("文件下载错误:", error);
   }
 };
 
@@ -814,22 +780,16 @@ watch(showRepository, (newVal) => {
   display: flex;
   align-items: center;
 }
-.input-area {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
+/* 统一按钮和选择框间隔，提升优先级，兼容AntD结构 */
+.left-options :deep(> *) {
+  margin-right: 8px !important;
 }
-.rag-button {
-  margin: 0 8px;
-  border-radius: 4px;
-  transition: all 0.3s;
-  font-size: 14px;
-  height: 32px;
-  padding: 0 12px;
+.left-options :deep(> *:last-child) {
+  margin-right: 0 !important;
 }
-.rag-button:hover {
-  opacity: 0.85;
-}
+/* 基础按钮样式 */
+.rag-button,
+.agent-button,
 .repository-button {
   border-radius: 4px;
   transition: all 0.3s;
@@ -837,17 +797,28 @@ watch(showRepository, (newVal) => {
   height: 32px;
   padding: 0 12px;
 }
+
+.rag-button:hover,
+.agent-button:hover,
 .repository-button:hover {
   opacity: 0.85;
 }
+
 :deep(.ant-select-selector) {
   border-radius: 4px !important;
   height: 32px !important;
   border-color: #d9d9d9 !important;
 }
+
 :deep(.ant-select-selection-item) {
   line-height: 30px !important;
   font-size: 14px;
+}
+
+.input-area {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
 }
 .chat-textarea {
   flex: 1;
@@ -1079,7 +1050,11 @@ watch(showRepository, (newVal) => {
   background-color: #bae7ff;
 }
 .repository-button {
-  margin-left: 8px;
+  border-radius: 4px;
+  transition: all 0.3s;
+  font-size: 14px;
+  height: 32px;
+  padding: 0 12px;
 }
 .repository-header {
   margin-bottom: 16px;

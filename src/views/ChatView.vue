@@ -148,7 +148,7 @@
           <div class="left-options">
             <a-select
               v-model:value="selectedModel"
-              style="width: 160px"
+              style="width: 160px; margin-right: 8px"
               placeholder="选择模型"
               size="middle"
             >
@@ -169,6 +169,7 @@
               :type="isRagEnabled ? 'primary' : 'default'"
               @click="isRagEnabled = !isRagEnabled"
               class="rag-button"
+              style="margin-right: 8px"
               size="middle"
             >
               检索增强
@@ -179,7 +180,7 @@
               class="repository-button"
               size="middle"
             >
-              知识库
+              知识库管理
             </a-button>
           </div>
         </div>
@@ -807,14 +808,11 @@ watch(showRepository, (newVal) => {
   border-top: 1px solid #f0f0f0;
 }
 .chat-options {
-  display: flex;
-  align-items: center;
   margin-bottom: 12px;
 }
 .left-options {
   display: flex;
   align-items: center;
-  gap: 8px;
 }
 .input-area {
   display: flex;
@@ -822,6 +820,7 @@ watch(showRepository, (newVal) => {
   gap: 12px;
 }
 .rag-button {
+  margin: 0 8px;
   border-radius: 4px;
   transition: all 0.3s;
   font-size: 14px;
@@ -829,6 +828,16 @@ watch(showRepository, (newVal) => {
   padding: 0 12px;
 }
 .rag-button:hover {
+  opacity: 0.85;
+}
+.repository-button {
+  border-radius: 4px;
+  transition: all 0.3s;
+  font-size: 14px;
+  height: 32px;
+  padding: 0 12px;
+}
+.repository-button:hover {
   opacity: 0.85;
 }
 :deep(.ant-select-selector) {

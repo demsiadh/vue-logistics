@@ -180,9 +180,17 @@
             v-model:value="inputMessage"
             placeholder="请输入您的问题..."
             :rows="1"
+            :auto-size="{ minRows: 1, maxRows: 4 }"
             :disabled="loading || !currentConversationId"
             class="chat-textarea"
             :class="{ 'is-disabled': loading || !currentConversationId }"
+            @keydown.enter.prevent
+            @keyup.enter="
+              !loading &&
+                currentConversationId &&
+                inputMessage.trim() &&
+                sendMessage()
+            "
           />
           <a-button
             type="primary"
@@ -631,8 +639,10 @@ const finishEdit = async (conv: { id: string; title: string }) => {
   font-size: 14px !important;
   padding: 8px 12px !important;
   min-height: 40px !important;
+  max-height: 120px !important;
   background: #fff !important;
   border: 1px solid #d9d9d9 !important;
+  overflow-y: auto !important;
 }
 .chat-textarea:hover {
   border-color: #40a9ff !important;
@@ -699,6 +709,8 @@ const finishEdit = async (conv: { id: string; title: string }) => {
   line-height: 1.7;
   font-size: 1.08em;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  max-height: none !important;
+  overflow-y: visible !important;
 }
 .user .message-text {
   background-color: #e6f7ff;

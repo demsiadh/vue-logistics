@@ -173,6 +173,14 @@
             >
               检索增强
             </a-button>
+            <a-button
+              :type="showRepository ? 'primary' : 'default'"
+              @click="showRepository = !showRepository"
+              class="repository-button"
+              size="middle"
+            >
+              知识库
+            </a-button>
           </div>
         </div>
         <div class="input-area">
@@ -206,17 +214,108 @@
         </div>
       </div>
     </a-card>
+    <a-drawer
+      title="知识库管理"
+      placement="right"
+      :visible="showRepository"
+      @close="showRepository = false"
+      :width="400"
+    >
+      <div class="repository-header">
+        <div class="repository-search">
+          <a-input-search
+            v-model:value="searchFileName"
+            placeholder="搜索文件名"
+            @search="handleSearch"
+            style="width: 200px"
+          />
+          <Upload
+            :customRequest="handleFileUpload"
+            :showUploadList="false"
+            :maxCount="1"
+            accept=".txt,.doc,.docx,.pdf"
+            :beforeUpload="
+              (file) => {
+                // 16KB = 16 * 1024 bytes
+                const isLt16KB = file.size / 1024 <= 16;
+                if (!isLt16KB) {
+                  antdMessage.error('仅支持16KB以下的文件！');
+                  return false;
+                }
+
+                // 检查文件类型
+                const allowedTypes = [
+                  'text/plain',
+                  'application/msword',
+                  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                  'application/pdf',
+                ];
+                if (!allowedTypes.includes(file.type)) {
+                  antdMessage.error('仅支持 txt、doc、docx、pdf 格式的文件！');
+                  return false;
+                }
+
+                return true;
+              }
+            "
+          >
+            <a-button type="primary" :loading="fileLoading">
+              <upload-outlined />
+              上传文件
+            </a-button>
+          </Upload>
+        </div>
+      </div>
+      <a-spin :spinning="fileLoading">
+        <div class="repository-list">
+          <a-empty v-if="fileList.length === 0" description="暂无文件" />
+          <a-list v-else :data-source="fileList">
+            <template #renderItem="{ item }">
+              <a-list-item>
+                <div class="file-item">
+                  <div class="file-info">
+                    <file-outlined />
+                    <span class="file-name">{{ item.fileName }}</span>
+                  </div>
+                  <div class="file-actions">
+                    <a-button
+                      type="link"
+                      size="small"
+                      @click="handleFileDownload(item.id)"
+                    >
+                      下载
+                    </a-button>
+                    <a-popconfirm
+                      title="确定要删除此文件吗?"
+                      @confirm="handleFileDelete(item.id)"
+                      ok-text="是"
+                      cancel-text="否"
+                    >
+                      <a-button type="link" danger size="small">
+                        删除
+                      </a-button>
+                    </a-popconfirm>
+                  </div>
+                </div>
+              </a-list-item>
+            </template>
+          </a-list>
+        </div>
+      </a-spin>
+    </a-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, nextTick, watch, computed } from "vue";
-import { message as antdMessage } from "ant-design-vue";
+import { message as antdMessage, Upload } from "ant-design-vue";
 import {
   DeleteOutlined,
   UserOutlined,
   RobotOutlined,
   InfoCircleOutlined,
+  UploadOutlined,
+  FileOutlined,
 } from "@ant-design/icons-vue";
 import { marked } from "marked";
 import {
@@ -227,6 +326,14 @@ import {
   createChat,
   ChatDetail,
 } from "@/api/chat";
+import {
+  uploadFile,
+  deleteFile,
+  getFileList,
+  downloadFileFromBase64,
+  BusinessType,
+  FileInfo,
+} from "@/api/file";
 
 // 在script部分添加类型定义
 interface Message {
@@ -267,6 +374,14 @@ const editingTitle = ref("");
 const isRagEnabled = ref(false);
 // 新增showGenericMap变量
 const showGenericMap = ref<{ [key: string]: boolean }>({});
+// 新增showRepository变量
+const showRepository = ref(false);
+// 新增fileList变量
+const fileList = ref<FileInfo[]>([]);
+// 新增fileLoading变量
+const fileLoading = ref(false);
+// 新增searchFileName变量
+const searchFileName = ref("");
 
 // 格式化日期
 const formatDate = (timestamp: number) => {
@@ -453,6 +568,100 @@ const finishEdit = async (conv: { id: string; title: string }) => {
   }
   editingId.value = null;
 };
+
+// 获取知识库文件列表
+const loadFileList = async () => {
+  try {
+    fileLoading.value = true;
+    const res = await getFileList({
+      fileType: BusinessType.AIRepository,
+      fileName: searchFileName.value || "",
+      skip: 0,
+      limit: 10,
+    });
+    fileList.value = res.data.data || [];
+  } catch (error) {
+    antdMessage.error("获取知识库列表失败");
+    fileList.value = [];
+  } finally {
+    fileLoading.value = false;
+  }
+};
+
+// 添加搜索处理函数
+const handleSearch = () => {
+  loadFileList();
+};
+
+// 处理文件上传
+const handleFileUpload = async (options: any) => {
+  const { file, onSuccess, onError } = options;
+
+  // 验证文件是否为空
+  if (!file || file.size === 0) {
+    antdMessage.error("文件不能为空！");
+    onError?.(new Error("文件不能为空！"));
+    return;
+  }
+
+  try {
+    fileLoading.value = true;
+    const res = await uploadFile(file, BusinessType.AIRepository);
+
+    if (res.data.code === 0) {
+      antdMessage.success("上传成功");
+      await loadFileList();
+      onSuccess?.(res);
+    } else {
+      throw new Error(res.data.message || "上传失败");
+    }
+  } catch (error: any) {
+    console.error("文件上传错误:", error);
+    antdMessage.error(error.message || "上传失败，请检查文件格式和大小");
+    onError?.(error);
+  } finally {
+    fileLoading.value = false;
+  }
+};
+
+// 处理文件删除
+const handleFileDelete = async (fileId: string) => {
+  try {
+    await deleteFile(fileId);
+    antdMessage.success("删除成功");
+    await loadFileList();
+  } catch (error) {
+    antdMessage.error("删除失败");
+  }
+};
+
+// 处理文件下载
+const handleFileDownload = async (fileId: string) => {
+  try {
+    // 从fileList中找到对应的文件信息
+    const fileInfo = fileList.value.find((file) => file.id === fileId);
+    if (!fileInfo || !fileInfo.fileData) {
+      throw new Error("文件不存在或数据为空");
+    }
+
+    // 使用文件信息中的Base64数据直接下载
+    await downloadFileFromBase64(
+      fileInfo.fileData,
+      fileInfo.fileName,
+      fileInfo.contentType
+    );
+    antdMessage.success("下载成功");
+  } catch (error) {
+    antdMessage.error("下载失败");
+  }
+};
+
+// 修改 showRepository 的 watch 处理
+watch(showRepository, (newVal) => {
+  if (newVal) {
+    loadFileList();
+  }
+});
 </script>
 
 <style scoped>
@@ -859,5 +1068,41 @@ const finishEdit = async (conv: { id: string; title: string }) => {
 }
 .message-text.has-content .generic-trigger {
   background-color: #bae7ff;
+}
+.repository-button {
+  margin-left: 8px;
+}
+.repository-header {
+  margin-bottom: 16px;
+}
+.repository-list {
+  height: calc(100vh - 180px);
+  overflow-y: auto;
+}
+.file-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+.file-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.file-name {
+  font-size: 14px;
+  color: #333;
+}
+.file-actions {
+  display: flex;
+  gap: 8px;
+}
+.repository-search {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 </style>
